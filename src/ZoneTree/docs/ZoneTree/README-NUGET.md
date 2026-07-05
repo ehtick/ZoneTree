@@ -251,9 +251,9 @@ ZoneTree uses async compressed WAL by default. It is the recommended starting po
 
 | Need | Consider |
 | --- | --- |
-| Default safe high-throughput WAL mode | Async compressed WAL |
-| Synchronous compressed WAL acknowledgment | Sync compressed WAL |
-| Simplest synchronous WAL path | Sync WAL |
+| Recommended high-throughput persistent WAL mode | Async compressed WAL |
+| Plain synchronous WAL write path | Sync WAL |
+| Compressed WAL with a synchronous caller write path and tail durability tradeoff | Sync compressed WAL |
 | Intentional no-WAL boundary for cache/temp/rebuildable data | No WAL |
 
 Disk segments can also use compression and different segment layouts. These options help tune disk space, read patterns, merge behavior, and file-size boundaries.

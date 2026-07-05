@@ -99,7 +99,8 @@ These APIs are low-level. Recovery tools should load the persisted metadata or p
 For production systems:
 
 * keep the default async compressed WAL unless you have a specific reason to change it,
-* use sync WAL modes only when synchronous WAL acknowledgment is required,
+* use Sync WAL when the application specifically needs the plain synchronous WAL path,
+* use sync-compressed WAL only when its compressed-block tail durability tradeoff is acceptable,
 * use `No WAL` only for cache, temporary, or intentionally rebuildable data,
 * keep maintenance running for long-lived write-heavy workloads,
 * dispose ZoneTree instances during graceful shutdown,

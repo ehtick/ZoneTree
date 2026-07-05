@@ -33,7 +33,7 @@ block:  256 KB
 
 Compressed WALs reduce log size and can improve write-path IO when data compresses well. They also add compression work. The async compressed mode is the default because it keeps WAL protection enabled while preserving high write throughput for most applications.
 
-Sync compressed WAL uses the same compressed WAL file shape with synchronous acknowledgment behavior. Use it when the application specifically needs synchronous WAL acknowledgment and wants compressed WAL storage.
+Sync compressed WAL uses the same compressed-block WAL file shape and tail behavior. Use Sync WAL when the application specifically needs the plain synchronous WAL path; use sync-compressed WAL when compressed WAL storage or throughput matters and its tail durability tradeoff is acceptable.
 
 ## Disk Segment Compression
 

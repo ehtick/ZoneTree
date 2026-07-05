@@ -10,22 +10,22 @@ Compression method, compression level, and block-size details are covered in [co
 
 | Need | Consider |
 | --- | --- |
-| Default safe high-throughput WAL mode | Async compressed WAL |
-| Synchronous compressed WAL acknowledgment | Sync compressed WAL |
-| Simplest synchronous WAL path | Sync WAL |
+| Recommended high-throughput persistent WAL mode | Async compressed WAL |
+| Plain synchronous WAL write path | Sync WAL |
+| Compressed WAL with a synchronous caller write path and tail durability tradeoff | Sync compressed WAL |
 | Intentional no-WAL boundary for cache/temp/rebuildable data | No WAL |
 
 ## Sync WAL
 
-Sync WAL writes records directly to the log path before the write is considered complete.
+Sync WAL writes records through the plain WAL stream before the write is considered complete. It favors simple synchronous WAL recovery semantics over write throughput.
 
-Use it when you want the simplest synchronous WAL path and can accept lower throughput.
+Use it when the application specifically needs the plain synchronous WAL path and can accept lower throughput. Full power-loss durability still depends on the operating system, file system, and storage device.
 
 ## Sync Compressed WAL
 
-Sync compressed WAL stores log records in compressed form. It balances durability and smaller WAL files with compression overhead.
+Sync compressed WAL stores log records in a compressed-block WAL format. The current tail block is stored separately and can be written by the tail writer job.
 
-Use it when WAL size matters and you want synchronous WAL acknowledgment.
+Use it when WAL size or write throughput matters and you can accept weaker crash durability than Sync WAL.
 
 In sync-compressed mode, the tail writer job is enabled by default and runs every `500 ms`.
 
@@ -43,6 +43,6 @@ Use it for caches, rebuildable indexes, temporary stores, and data that can be r
 
 ## Durability Boundary
 
-ZoneTree's WAL protects against process-level failures according to the selected mode and flush behavior. Hardware, operating system, and storage-device behavior still matter for full power-loss guarantees.
+ZoneTree's WAL protects against process-level failures according to the selected mode and flush behavior. Hardware, operating system, file-system, and storage-device behavior still matter for full power-loss guarantees.
 
-Choose `No WAL` only when the data-loss boundary is intentional. For most persistent data, start with the default async compressed WAL and move to a sync mode only when the application specifically needs synchronous WAL acknowledgment.
+Choose `No WAL` only when the data-loss boundary is intentional. For most persistent data, start with the default async compressed WAL and move to Sync WAL only when the application specifically needs the plain synchronous WAL path.
