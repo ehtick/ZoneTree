@@ -7,7 +7,8 @@ Use this checklist before putting ZoneTree behind production traffic.
 * Choose the data directory intentionally.
 * Ensure the storage volume has enough free space.
 * Start with the default async compressed WAL for persistent data.
-* Use sync WAL modes only when synchronous WAL acknowledgment is required.
+* Use Sync WAL when the application specifically needs the plain synchronous WAL path.
+* Use sync-compressed WAL only when its compressed-block tail durability tradeoff is acceptable.
 * Use `No WAL` only for cache, temporary, or intentionally rebuildable data.
 * Choose disk segment mode based on database size and operational file-size needs.
 * Tune sparse arrays, block cache lifetime, and circular key/value caches only after measuring read behavior.

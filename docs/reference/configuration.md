@@ -139,7 +139,7 @@ Important WAL options:
 | `AsyncCompressedModeOptions` | async writer polling behavior |
 | `EnableIncrementalBackup` | preserves WAL content during WAL replacement/compaction |
 
-Use sync modes when the application specifically needs synchronous WAL acknowledgment. Use `No WAL` only for cache, temporary, or intentionally rebuildable data.
+Use the default async compressed WAL as the starting point for most persistent data. Use Sync WAL when the application specifically needs the plain synchronous WAL path. Use sync-compressed WAL when the compressed WAL tradeoff is acceptable. Use `No WAL` only for cache, temporary, or intentionally rebuildable data.
 
 The default WAL profile uses async compressed WAL, `256 KB` compression blocks, Zstd level `0` compression, and a `100 ms` async empty-queue poll interval.
 

@@ -165,16 +165,6 @@ public sealed class ZoneTreeOptions<TKey, TValue>
       MarkValueDeleted = ComponentsForKnownTypes.GetMarkValueDeleted<TValue>();
   }
 
-  static bool IsAssignableToNull(Type type)
-  {
-    if (!type.IsValueType || Nullable.GetUnderlyingType(type) != null)
-    {
-      return true;
-    }
-
-    return false;
-  }
-
   /// <summary>
   /// Disables deletion to be able to insert default values of the value type.
   /// Databases created with this option are not able to delete records.
