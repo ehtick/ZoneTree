@@ -47,7 +47,7 @@ If the key is absent, ZoneTree writes `1`. If it is present, the updater receive
 ## Compare And Set
 
 ```csharp
-var changed = zoneTree.TryAtomicGetAndUpdate(
+var found = zoneTree.TryAtomicGetAndUpdate(
     "order:123:state",
     out var current,
     (ref OrderState state) =>
@@ -60,7 +60,7 @@ var changed = zoneTree.TryAtomicGetAndUpdate(
     });
 ```
 
-`changed` is `false` only when the key is not found. If the key is found and the delegate returns `false`, the method still returns `true` because the read succeeded, but no new value is written.
+`found` is `false` only when the key is not found. If the key is found and the delegate returns `false`, the method still returns `true` because the read succeeded, but no new value is written.
 
 ## Initialize Or Update With A Callback
 
