@@ -146,17 +146,17 @@ public sealed class SafeBTreeTests
     {
       Parallel.For(0, insertCount, (x) =>
           {
-          var key = random.Next();
-          tree.AddOrUpdate(key,
-                  void (ref int value) =>
-                  {
-                  value = key + key;
-                },
-                  void (ref int value) =>
-                  {
-                  value = key + key;
-                }, out _);
-        });
+            var key = random.Next();
+            tree.AddOrUpdate(key,
+                    void (ref int value) =>
+                    {
+                      value = key + key;
+                    },
+                    void (ref int value) =>
+                    {
+                      value = key + key;
+                    }, out _);
+          });
     });
     Thread.Sleep(100);
     Parallel.For(0, iteratorCount, (x) =>
@@ -199,17 +199,17 @@ public sealed class SafeBTreeTests
     {
       Parallel.For(0, insertCount, (x) =>
           {
-          var key = random.Next();
-          tree.AddOrUpdate(key,
-                  void (ref int x) =>
-                  {
-                  x = key + key;
-                },
-                  void (ref int y) =>
-                  {
-                  y = key + key;
-                }, out _);
-        });
+            var key = random.Next();
+            tree.AddOrUpdate(key,
+                    void (ref int x) =>
+                    {
+                      x = key + key;
+                    },
+                    void (ref int y) =>
+                    {
+                      y = key + key;
+                    }, out _);
+          });
     });
     Parallel.For(0, iteratorCount, (x) =>
     {
@@ -258,9 +258,9 @@ public sealed class SafeBTreeTests
     {
       Parallel.For(0, insertCount, (x) =>
           {
-          var key = random.Next(0, 100000);
-          tree.Upsert(key, key + key, out _);
-        });
+            var key = random.Next(0, 100000);
+            tree.Upsert(key, key + key, out _);
+          });
     });
 
     Parallel.For(0, iteratorCount, (x) =>
@@ -302,9 +302,9 @@ public sealed class SafeBTreeTests
     {
       Parallel.For(0, insertCount, (x) =>
           {
-          var key = random.Next(0, 100000);
-          tree.Upsert(key, key + key, out _);
-        });
+            var key = random.Next(0, 100000);
+            tree.Upsert(key, key + key, out _);
+          });
     });
 
     Parallel.For(0, iteratorCount, (x) =>

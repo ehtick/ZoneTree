@@ -258,9 +258,9 @@ public sealed class IteratorTests
     {
       Parallel.For(0, insertCount, (x) =>
           {
-          var key = random.Next();
-          zoneTree.Upsert(key, key + key);
-        });
+            var key = random.Next();
+            zoneTree.Upsert(key, key + key);
+          });
     });
     Parallel.For(0, iteratorCount, (x) =>
     {
@@ -311,9 +311,9 @@ public sealed class IteratorTests
     {
       Parallel.For(0, insertCount, (x) =>
           {
-          var key = random.Next(0, 100_000);
-          zoneTree.Upsert(key, key + key);
-        });
+            var key = random.Next(0, 100_000);
+            zoneTree.Upsert(key, key + key);
+          });
     });
     Parallel.For(0, iteratorCount, (x) =>
     {
@@ -370,8 +370,8 @@ public sealed class IteratorTests
     {
       Parallel.For(0, insertCount, (x) =>
           {
-          zoneTree.Upsert(x, x + x);
-        });
+            zoneTree.Upsert(x, x + x);
+          });
     });
     Parallel.For(0, iteratorCount, (x) =>
     {
