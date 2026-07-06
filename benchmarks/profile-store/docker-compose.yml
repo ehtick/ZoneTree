@@ -1,0 +1,52 @@
+services:
+  mysql:
+    image: mysql:9.7.1
+    environment:
+      MYSQL_ROOT_PASSWORD: "DevMySql_123456!"
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_DATABASE: profilebench
+    command:
+      - --skip-log-bin
+      - --innodb-flush-log-at-trx-commit=2
+      - --sync-binlog=0
+      - --innodb-buffer-pool-size=8G
+      - --innodb-redo-log-capacity=4G
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pDevMySql_123456!"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  benchmark:
+    build:
+      context: ../..
+      dockerfile: benchmarks/profile-store/Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: profilebench
+      MYSQL_USER: root
+      MYSQL_PASSWORD: "DevMySql_123456!"
+    command:
+      - --engine
+      - all
+      - --profiles
+      - "100000"
+      - --seed
+      - "20260706"
+      - --output
+      - /workspace/benchmarks/profile-store/results
+    volumes:
+      - ./results:/workspace/benchmarks/profile-store/results
+      - ./data:/workspace/benchmarks/profile-store/data
+
+volumes:
+  mysql_data:
+    name: mysql_data
