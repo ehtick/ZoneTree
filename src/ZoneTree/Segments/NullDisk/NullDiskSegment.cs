@@ -110,6 +110,13 @@ public sealed class NullDiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     return new NullDiskSegmentSeekableIterator<TKey, TValue>();
   }
 
+  public ISeekableIterator<TKey, TValue> GetSeekableIterator(
+      bool contributeToTheBlockCache,
+      int prefetchSize)
+  {
+    return new NullDiskSegmentSeekableIterator<TKey, TValue>();
+  }
+
   public void ReleaseResources()
   {
     // Nothing to release.

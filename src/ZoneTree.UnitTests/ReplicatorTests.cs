@@ -37,9 +37,9 @@ public sealed class ReplicatorTests
         var opIndex = zoneTree.Upsert(key, value);
         Task.Run(() =>
               {
-            replicator.OnUpsert(key, value, opIndex);
-            Interlocked.Increment(ref replicated);
-          });
+                replicator.OnUpsert(key, value, opIndex);
+                Interlocked.Increment(ref replicated);
+              });
       });
       while (replicated < recordCount) Task.Delay(500).Wait();
       maintainer1.EvictToDisk();
@@ -116,9 +116,9 @@ public sealed class ReplicatorTests
           var opIndex = zoneTree.Upsert(key, value);
           Task.Run(() =>
                   {
-              replicator.OnUpsert(key, value, opIndex);
-              Interlocked.Increment(ref replicated);
-            });
+                    replicator.OnUpsert(key, value, opIndex);
+                    Interlocked.Increment(ref replicated);
+                  });
         });
         while (replicated < recordCount) Task.Delay(500).Wait();
         maintainer1.EvictToDisk();

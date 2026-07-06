@@ -91,12 +91,12 @@ public sealed class ExceptionlessTransactionTests
           .Do((tx) => zoneTree.UpsertNoThrow(tx, 3, 9))
           .Do((tx) =>
           {
-          if (zoneTree.TryGetNoThrow(tx, 3, out var value).IsAborted)
-            return TransactionResult.Aborted();
-          if (zoneTree.UpsertNoThrow(tx, 3, 9).IsAborted)
-            return TransactionResult.Aborted();
-          return TransactionResult.Success();
-        })
+            if (zoneTree.TryGetNoThrow(tx, 3, out var value).IsAborted)
+              return TransactionResult.Aborted();
+            if (zoneTree.UpsertNoThrow(tx, 3, 9).IsAborted)
+              return TransactionResult.Aborted();
+            return TransactionResult.Success();
+          })
           .SetRetryCountForPendingTransactions(100)
           .SetRetryCountForAbortedTransactions(10);
       await transaction.CommitAsync();

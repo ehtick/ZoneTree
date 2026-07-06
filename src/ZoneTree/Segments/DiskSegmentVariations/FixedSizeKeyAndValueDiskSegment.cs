@@ -180,6 +180,52 @@ public sealed class FixedSizeKeyAndValueDiskSegment<TKey, TValue> : DiskSegment<
     }
   }
 
+  public override int ReadEntries(
+      long startIndex,
+      int count,
+      TKey[] keys,
+      TValue[] values,
+      int destinationIndex,
+      BlockPin blockPin)
+  {
+    if (startIndex < 0 || startIndex >= Length || count <= 0)
+      return 0;
+    count = (int)Math.Min(count, Length - startIndex);
+
+    try
+    {
+      Interlocked.Increment(ref ReadCount);
+      if (IsDropping)
+      {
+        throw new DiskSegmentIsDroppingException();
+      }
+
+      var itemSize = KeySize + ValueSize;
+      var pin1 = blockPin?.ToSingleBlockPin(1);
+      var bytes = DataDevice.GetBytes(
+          itemSize * startIndex,
+          itemSize * count,
+          pin1);
+
+      for (var i = 0; i < count; ++i)
+      {
+        var sourceOffset = i * itemSize;
+        var targetIndex = destinationIndex + i;
+        keys[targetIndex] = KeySerializer.Deserialize(
+            bytes.Slice(sourceOffset, KeySize));
+        values[targetIndex] = ValueSerializer.Deserialize(
+            bytes.Slice(sourceOffset + KeySize, ValueSize));
+      }
+
+      blockPin?.SetDevice1(pin1.Device);
+      return count;
+    }
+    finally
+    {
+      Interlocked.Decrement(ref ReadCount);
+    }
+  }
+
   protected override void DeleteDevices()
   {
     DataDevice?.Delete();

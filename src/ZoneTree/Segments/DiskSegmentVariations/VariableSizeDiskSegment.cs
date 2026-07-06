@@ -217,6 +217,75 @@ public sealed partial class VariableSizeDiskSegment<TKey, TValue> : DiskSegment<
     }
   }
 
+  public unsafe override int ReadEntries(
+      long startIndex,
+      int count,
+      TKey[] keys,
+      TValue[] values,
+      int destinationIndex,
+      BlockPin blockPin)
+  {
+    if (startIndex < 0 || startIndex >= Length || count <= 0)
+      return 0;
+    count = (int)Math.Min(count, Length - startIndex);
+
+    try
+    {
+      Interlocked.Increment(ref ReadCount);
+      if (IsDropping)
+      {
+        throw new DiskSegmentIsDroppingException();
+      }
+
+      var pin1 = blockPin?.ToSingleBlockPin(1);
+      var pin2 = blockPin?.ToSingleBlockPin(2);
+      var headSize = sizeof(EntryHead);
+      var headerBytes = DataHeaderDevice.GetBytes(
+          startIndex * headSize,
+          count * headSize,
+          pin1);
+
+      for (var i = 0; i < count; ++i)
+      {
+        var targetIndex = destinationIndex + i;
+        var head = BinarySerializerHelper.FromByteArray<EntryHead>(
+            headerBytes,
+            i * headSize);
+        if (head.ValueOffset == head.KeyOffset + head.KeyLength)
+        {
+          var entryBytes = DataDevice.GetBytes(
+              head.KeyOffset,
+              head.KeyLength + head.ValueLength,
+              pin2);
+          keys[targetIndex] = KeySerializer.Deserialize(
+              entryBytes.Slice(0, head.KeyLength));
+          values[targetIndex] = ValueSerializer.Deserialize(
+              entryBytes.Slice(head.KeyLength, head.ValueLength));
+          continue;
+        }
+
+        keys[targetIndex] = KeySerializer.Deserialize(
+            DataDevice.GetBytes(
+                head.KeyOffset,
+                head.KeyLength,
+                pin2));
+        values[targetIndex] = ValueSerializer.Deserialize(
+            DataDevice.GetBytes(
+                head.ValueOffset,
+                head.ValueLength,
+                pin2));
+      }
+
+      blockPin?.SetDevice1(pin1.Device);
+      blockPin?.SetDevice2(pin2.Device);
+      return count;
+    }
+    finally
+    {
+      Interlocked.Decrement(ref ReadCount);
+    }
+  }
+
   protected override void DeleteDevices()
   {
     DataHeaderDevice?.Delete();
