@@ -264,6 +264,32 @@ public interface IZoneTree<TKey, TValue> : IDisposable
       bool contributeToTheBlockCache = false);
 
   /// <summary>
+  /// Creates an iterator that enables scanning of the entire database.
+  /// </summary>
+  /// <param name="iteratorType">Defines iterator type.</param>
+  /// <param name="includeDeletedRecords">if true the iterator retrieves
+  /// the deleted and normal records.</param>
+  /// <param name="contributeToTheBlockCache">if true the iterator disk segment reads
+  /// contributes to the block cache.</param>
+  /// <param name="diskSegmentPrefetchSize">The number of sequential disk-segment
+  /// records the iterator may prefetch at once. Values less than two disable
+  /// prefetching.</param>
+  /// <returns>ZoneTree Iterator</returns>
+  IZoneTreeIterator<TKey, TValue> CreateIterator(
+      IteratorType iteratorType,
+      bool includeDeletedRecords,
+      bool contributeToTheBlockCache,
+      int diskSegmentPrefetchSize);
+
+  /// <summary>
+  /// Creates an iterator that enables scanning of the entire database.
+  /// </summary>
+  /// <param name="iteratorOptions">Runtime iterator options.</param>
+  /// <returns>ZoneTree Iterator</returns>
+  IZoneTreeIterator<TKey, TValue> CreateIterator(
+      IteratorOptions iteratorOptions);
+
+  /// <summary>
   /// Creates a reverse iterator that enables scanning of the entire database.
   /// </summary>
   ///
@@ -283,6 +309,32 @@ public interface IZoneTree<TKey, TValue> : IDisposable
       IteratorType iteratorType = IteratorType.AutoRefresh,
       bool includeDeletedRecords = false,
       bool contributeToTheBlockCache = false);
+
+  /// <summary>
+  /// Creates a reverse iterator that enables scanning of the entire database.
+  /// </summary>
+  /// <param name="iteratorType">Defines iterator type.</param>
+  /// <param name="includeDeletedRecords">if true the iterator retrieves
+  /// the deleted and normal records.</param>
+  /// <param name="contributeToTheBlockCache">if true the iterator disk segment reads
+  /// contributes to the block cache.</param>
+  /// <param name="diskSegmentPrefetchSize">The number of sequential disk-segment
+  /// records the iterator may prefetch at once. Values less than two disable
+  /// prefetching.</param>
+  /// <returns>ZoneTree Iterator</returns>
+  IZoneTreeIterator<TKey, TValue> CreateReverseIterator(
+      IteratorType iteratorType,
+      bool includeDeletedRecords,
+      bool contributeToTheBlockCache,
+      int diskSegmentPrefetchSize);
+
+  /// <summary>
+  /// Creates a reverse iterator that enables scanning of the entire database.
+  /// </summary>
+  /// <param name="iteratorOptions">Runtime iterator options.</param>
+  /// <returns>ZoneTree Iterator</returns>
+  IZoneTreeIterator<TKey, TValue> CreateReverseIterator(
+      IteratorOptions iteratorOptions);
 
   /// <summary>
   /// Returns maintenance object belongs to this ZoneTree.

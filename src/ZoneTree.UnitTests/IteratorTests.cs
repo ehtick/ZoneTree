@@ -479,6 +479,67 @@ public sealed class IteratorTests
     zoneTree.Maintenance.Drop();
   }
 
+  [TestCase(DiskSegmentMode.SingleDiskSegment)]
+  [TestCase(DiskSegmentMode.MultiPartDiskSegment)]
+  public void PrefetchingDiskIteratorScansFixedSizeKeyAndValueSegment(DiskSegmentMode diskSegmentMode)
+  {
+    AssertPrefetchingDiskIteratorScans(
+        "FixedSizeKeyAndValue",
+        diskSegmentMode,
+        i => i,
+        i => i * 10,
+        factory => factory.DisableDeletion(),
+        Comparer<int>.Default);
+  }
+
+  [TestCase(DiskSegmentMode.SingleDiskSegment)]
+  [TestCase(DiskSegmentMode.MultiPartDiskSegment)]
+  public void PrefetchingDiskIteratorScansFixedSizeKeySegment(DiskSegmentMode diskSegmentMode)
+  {
+    AssertPrefetchingDiskIteratorScans(
+        "FixedSizeKey",
+        diskSegmentMode,
+        i => i,
+        i => "value-" + i.ToString("D4"),
+        factory => factory
+            .DisableDeletion()
+            .SetValueSerializer(new Utf8StringSerializer()),
+        Comparer<int>.Default);
+  }
+
+  [TestCase(DiskSegmentMode.SingleDiskSegment)]
+  [TestCase(DiskSegmentMode.MultiPartDiskSegment)]
+  public void PrefetchingDiskIteratorScansFixedSizeValueSegment(DiskSegmentMode diskSegmentMode)
+  {
+    AssertPrefetchingDiskIteratorScans(
+        "FixedSizeValue",
+        diskSegmentMode,
+        i => "key-" + i.ToString("D4"),
+        i => i * 10,
+        factory => factory
+            .DisableDeletion()
+            .SetComparer(new StringOrdinalComparerAscending())
+            .SetKeySerializer(new Utf8StringSerializer()),
+        StringComparer.Ordinal);
+  }
+
+  [TestCase(DiskSegmentMode.SingleDiskSegment)]
+  [TestCase(DiskSegmentMode.MultiPartDiskSegment)]
+  public void PrefetchingDiskIteratorScansVariableSizeSegment(DiskSegmentMode diskSegmentMode)
+  {
+    AssertPrefetchingDiskIteratorScans(
+        "VariableSize",
+        diskSegmentMode,
+        i => "key-" + i.ToString("D4"),
+        i => "value-" + i.ToString("D4"),
+        factory => factory
+            .DisableDeletion()
+            .SetComparer(new StringOrdinalComparerAscending())
+            .SetKeySerializer(new Utf8StringSerializer())
+            .SetValueSerializer(new Utf8StringSerializer()),
+        StringComparer.Ordinal);
+  }
+
   [TestCase(true, DiskSegmentMode.SingleDiskSegment, 0, 0)]
   [TestCase(false, DiskSegmentMode.SingleDiskSegment, 0, 0)]
   [TestCase(true, DiskSegmentMode.MultiPartDiskSegment, 0, 0)]
@@ -553,6 +614,94 @@ public sealed class IteratorTests
     }
     list.Sort((a, b) => string.Compare(a.Item1, b.Item1, StringComparison.CurrentCulture));
     return list;
+  }
+
+  static void AssertPrefetchingDiskIteratorScans<TKey, TValue>(
+      string name,
+      DiskSegmentMode diskSegmentMode,
+      Func<int, TKey> keyFactory,
+      Func<int, TValue> valueFactory,
+      Func<ZoneTreeFactory<TKey, TValue>, ZoneTreeFactory<TKey, TValue>> configureFactory,
+      IComparer<TKey> expectedComparer)
+  {
+    var dataPath = "data/PrefetchingDiskIteratorScans" + name + diskSegmentMode;
+    if (Directory.Exists(dataPath))
+      Directory.Delete(dataPath, true);
+
+    const int recordCount = 37;
+    var expected = new List<KeyValuePair<TKey, TValue>>(recordCount);
+
+    using var zoneTree = configureFactory(new ZoneTreeFactory<TKey, TValue>())
+        .Configure(options => options.AllowUnsafeOptionValues = true)
+        .SetMutableSegmentMaxItemCount(5)
+        .SetDataDirectory(dataPath)
+        .SetWriteAheadLogDirectory(dataPath)
+        .ConfigureWriteAheadLogOptions(options =>
+            options.WriteAheadLogMode = WriteAheadLogMode.None)
+        .ConfigureDiskSegmentOptions(options =>
+        {
+          options.DiskSegmentMode = diskSegmentMode;
+          if (diskSegmentMode == DiskSegmentMode.MultiPartDiskSegment)
+          {
+            options.MinimumRecordCount = 3;
+            options.MaximumRecordCount = 5;
+          }
+        })
+        .OpenOrCreate();
+
+    for (var i = 0; i < recordCount; ++i)
+    {
+      var key = keyFactory(i);
+      var value = valueFactory(i);
+      expected.Add(KeyValuePair.Create(key, value));
+      zoneTree.Upsert(key, value);
+    }
+
+    zoneTree.Maintenance.MoveMutableSegmentForward();
+    zoneTree.Maintenance.StartMergeOperation().Join();
+    expected.Sort((x, y) => expectedComparer.Compare(x.Key, y.Key));
+
+    var iteratorOptions = new IteratorOptions
+    {
+      IteratorType = IteratorType.NoRefresh,
+      DiskSegmentPrefetchSize = 3
+    };
+
+    using (var iterator = zoneTree.CreateIterator(iteratorOptions))
+    {
+      for (var i = 0; i < expected.Count; ++i)
+      {
+        Assert.That(iterator.Next(), Is.True);
+        Assert.That(iterator.CurrentKey, Is.EqualTo(expected[i].Key));
+        Assert.That(iterator.CurrentValue, Is.EqualTo(expected[i].Value));
+      }
+      Assert.That(iterator.Next(), Is.False);
+    }
+
+    using (var iterator = zoneTree.CreateIterator(iteratorOptions))
+    {
+      iterator.Seek(expected[10].Key);
+      for (var i = 10; i < expected.Count; ++i)
+      {
+        Assert.That(iterator.Next(), Is.True);
+        Assert.That(iterator.CurrentKey, Is.EqualTo(expected[i].Key));
+        Assert.That(iterator.CurrentValue, Is.EqualTo(expected[i].Value));
+      }
+      Assert.That(iterator.Next(), Is.False);
+    }
+
+    using (var reverseIterator = zoneTree.CreateReverseIterator(iteratorOptions))
+    {
+      for (var i = expected.Count - 1; i >= 0; --i)
+      {
+        Assert.That(reverseIterator.Next(), Is.True);
+        Assert.That(reverseIterator.CurrentKey, Is.EqualTo(expected[i].Key));
+        Assert.That(reverseIterator.CurrentValue, Is.EqualTo(expected[i].Value));
+      }
+      Assert.That(reverseIterator.Next(), Is.False);
+    }
+
+    zoneTree.Maintenance.Drop();
   }
 
   [TestCase(true, DiskSegmentMode.SingleDiskSegment, 0, 0)]

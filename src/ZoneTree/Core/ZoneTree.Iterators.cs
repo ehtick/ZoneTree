@@ -1,4 +1,5 @@
 using ZoneTree.Collections;
+using ZoneTree.Options;
 using ZoneTree.Segments;
 using ZoneTree.Segments.NullDisk;
 
@@ -10,7 +11,8 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
       bool includeMutableSegment,
       bool includeDiskSegment,
       bool includeBottomSegments,
-      bool contributeToTheBlockCache)
+      bool contributeToTheBlockCache,
+      int diskSegmentPrefetchSize)
   {
     lock (ShortMergerLock)
       lock (AtomicUpdateLock)
@@ -35,7 +37,9 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
           {
             diskSegment.AttachIterator();
             result.DiskSegment = diskSegment;
-            seekableIterators.Add(diskSegment.GetSeekableIterator(contributeToTheBlockCache));
+            seekableIterators.Add(diskSegment.GetSeekableIterator(
+                contributeToTheBlockCache,
+                diskSegmentPrefetchSize));
           }
         }
 
@@ -45,7 +49,9 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
           foreach (var bottom in bottomSegments)
           {
             bottom.AttachIterator();
-            seekableIterators.Add(bottom.GetSeekableIterator(contributeToTheBlockCache));
+            seekableIterators.Add(bottom.GetSeekableIterator(
+                contributeToTheBlockCache,
+                diskSegmentPrefetchSize));
           }
           result.BottomSegments = bottomSegments;
         }
@@ -189,6 +195,32 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
   public IZoneTreeIterator<TKey, TValue> CreateIterator(
       IteratorType iteratorType, bool includeDeletedRecords, bool contributeToTheBlockCache)
   {
+    return CreateIterator(
+        iteratorType,
+        includeDeletedRecords,
+        contributeToTheBlockCache,
+        IteratorDefaultValues.DiskSegmentPrefetchSize);
+  }
+
+  public IZoneTreeIterator<TKey, TValue> CreateIterator(
+      IteratorType iteratorType,
+      bool includeDeletedRecords,
+      bool contributeToTheBlockCache,
+      int diskSegmentPrefetchSize)
+  {
+    return CreateIterator(new IteratorOptions
+    {
+      IteratorType = iteratorType,
+      IncludeDeletedRecords = includeDeletedRecords,
+      ContributeToTheBlockCache = contributeToTheBlockCache,
+      DiskSegmentPrefetchSize = diskSegmentPrefetchSize
+    });
+  }
+
+  public IZoneTreeIterator<TKey, TValue> CreateIterator(IteratorOptions iteratorOptions)
+  {
+    ArgumentNullException.ThrowIfNull(iteratorOptions);
+    var iteratorType = iteratorOptions.IteratorType;
     var includeMutableSegment = iteratorType is not IteratorType.Snapshot and
         not IteratorType.ReadOnlyRegion;
 
@@ -198,11 +230,12 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
         MinHeapEntryComparer,
         autoRefresh: iteratorType == IteratorType.AutoRefresh,
         isReverseIterator: false,
-        includeDeletedRecords,
+        iteratorOptions.IncludeDeletedRecords,
         includeMutableSegment: includeMutableSegment,
         includeDiskSegment: true,
-        includeBottomSegments: true);
-    iterator.ContributeToTheBlockCache = contributeToTheBlockCache;
+        includeBottomSegments: true,
+        iteratorOptions.DiskSegmentPrefetchSize);
+    iterator.ContributeToTheBlockCache = iteratorOptions.ContributeToTheBlockCache;
 
     if (iteratorType == IteratorType.Snapshot)
     {
@@ -221,6 +254,32 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
   public IZoneTreeIterator<TKey, TValue> CreateReverseIterator(
       IteratorType iteratorType, bool includeDeletedRecords, bool contributeToTheBlockCache)
   {
+    return CreateReverseIterator(
+        iteratorType,
+        includeDeletedRecords,
+        contributeToTheBlockCache,
+        IteratorDefaultValues.DiskSegmentPrefetchSize);
+  }
+
+  public IZoneTreeIterator<TKey, TValue> CreateReverseIterator(
+      IteratorType iteratorType,
+      bool includeDeletedRecords,
+      bool contributeToTheBlockCache,
+      int diskSegmentPrefetchSize)
+  {
+    return CreateReverseIterator(new IteratorOptions
+    {
+      IteratorType = iteratorType,
+      IncludeDeletedRecords = includeDeletedRecords,
+      ContributeToTheBlockCache = contributeToTheBlockCache,
+      DiskSegmentPrefetchSize = diskSegmentPrefetchSize
+    });
+  }
+
+  public IZoneTreeIterator<TKey, TValue> CreateReverseIterator(IteratorOptions iteratorOptions)
+  {
+    ArgumentNullException.ThrowIfNull(iteratorOptions);
+    var iteratorType = iteratorOptions.IteratorType;
     var includeMutableSegment = iteratorType is not IteratorType.Snapshot and
         not IteratorType.ReadOnlyRegion;
 
@@ -230,12 +289,13 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
         MaxHeapEntryComparer,
         autoRefresh: iteratorType == IteratorType.AutoRefresh,
         isReverseIterator: true,
-        includeDeletedRecords,
+        iteratorOptions.IncludeDeletedRecords,
         includeMutableSegment: includeMutableSegment,
         includeDiskSegment: true,
-        includeBottomSegments: true);
+        includeBottomSegments: true,
+        iteratorOptions.DiskSegmentPrefetchSize);
 
-    iterator.ContributeToTheBlockCache = contributeToTheBlockCache;
+    iterator.ContributeToTheBlockCache = iteratorOptions.ContributeToTheBlockCache;
 
     if (iteratorType == IteratorType.Snapshot)
     {
@@ -267,7 +327,8 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
         includeDeletedRecords,
         includeMutableSegment: false,
         includeDiskSegment: false,
-        includeBottomSegments: false);
+        includeBottomSegments: false,
+        diskSegmentPrefetchSize: 0);
     return iterator;
   }
 
@@ -290,7 +351,8 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
         includeDeletedRecords,
         includeMutableSegment: true,
         includeDiskSegment: false,
-        includeBottomSegments: false);
+        includeBottomSegments: false,
+        diskSegmentPrefetchSize: 0);
     return iterator;
   }
 }

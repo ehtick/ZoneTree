@@ -453,7 +453,23 @@ public sealed class MultiPartDiskSegment<TKey, TValue> : IDiskSegment<TKey, TVal
 
   public ISeekableIterator<TKey, TValue> GetSeekableIterator(bool contributeToTheBlockCache)
   {
-    return new SeekableIterator<TKey, TValue>(this, contributeToTheBlockCache);
+    return GetSeekableIterator(
+        contributeToTheBlockCache,
+        IteratorDefaultValues.DiskSegmentPrefetchSize);
+  }
+
+  public ISeekableIterator<TKey, TValue> GetSeekableIterator(
+      bool contributeToTheBlockCache,
+      int prefetchSize)
+  {
+    if (prefetchSize < 2)
+      return new SeekableIterator<TKey, TValue>(this, contributeToTheBlockCache);
+
+    return new PrefetchingSeekableIterator<TKey, TValue>(
+          this,
+          ReadEntries,
+          prefetchSize,
+          contributeToTheBlockCache);
   }
 
   public void InitSparseArray(int size)
@@ -689,5 +705,74 @@ public sealed class MultiPartDiskSegment<TKey, TValue> : IDiskSegment<TKey, TVal
       return PartValues[partIndex * 2 + 1];
 
     return Parts[partIndex].GetValue(localIndex, blockPin);
+  }
+
+  public int ReadEntries(
+     long startIndex,
+     int count,
+     TKey[] keys,
+     TValue[] values,
+     int destinationIndex,
+     BlockPin blockPin)
+  {
+    if (startIndex < 0 || startIndex >= Length || count <= 0)
+      return 0;
+    count = (int)Math.Min(count, Length - startIndex);
+
+    var partIndex = 0;
+    long partStartIndex = 0;
+    var partLength = Parts[partIndex].Length;
+    while (partStartIndex + partLength <= startIndex)
+    {
+      partStartIndex += partLength;
+      ++partIndex;
+      partLength = Parts[partIndex].Length;
+    }
+
+    var read = 0;
+    while (read < count)
+    {
+      var part = Parts[partIndex];
+      var localIndex = startIndex + read - partStartIndex;
+      var partReadCount = (int)Math.Min(count - read, part.Length - localIndex);
+      var targetIndex = destinationIndex + read;
+      if (part is DiskSegment<TKey, TValue> diskSegment)
+      {
+        read += diskSegment.ReadEntries(
+            localIndex,
+            partReadCount,
+            keys,
+            values,
+            targetIndex,
+            blockPin);
+      }
+      else if (part is MultiPartDiskSegment<TKey, TValue> multiPartDiskSegment)
+      {
+        read += multiPartDiskSegment.ReadEntries(
+            localIndex,
+            partReadCount,
+            keys,
+            values,
+            targetIndex,
+            blockPin);
+      }
+      else
+      {
+        for (var i = 0; i < partReadCount; ++i)
+        {
+          keys[targetIndex + i] = part.GetKey(localIndex + i, blockPin);
+          values[targetIndex + i] = part.GetValue(localIndex + i, blockPin);
+        }
+        read += partReadCount;
+      }
+
+      if (read == count)
+        break;
+
+      partStartIndex += part.Length;
+      ++partIndex;
+    }
+
+    return read;
   }
 }

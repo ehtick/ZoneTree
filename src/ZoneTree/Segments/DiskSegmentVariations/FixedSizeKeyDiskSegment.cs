@@ -208,6 +208,60 @@ public sealed class FixedSizeKeyDiskSegment<TKey, TValue> : DiskSegment<TKey, TV
     }
   }
 
+  public unsafe override int ReadEntries(
+      long startIndex,
+      int count,
+      TKey[] keys,
+      TValue[] values,
+      int destinationIndex,
+      BlockPin blockPin)
+  {
+    if (startIndex < 0 || startIndex >= Length || count <= 0)
+      return 0;
+    count = (int)Math.Min(count, Length - startIndex);
+
+    try
+    {
+      Interlocked.Increment(ref ReadCount);
+      if (IsDropping)
+      {
+        throw new DiskSegmentIsDroppingException();
+      }
+
+      var pin1 = blockPin?.ToSingleBlockPin(1);
+      var pin2 = blockPin?.ToSingleBlockPin(2);
+      var headSize = sizeof(ValueHead) + KeySize;
+      var headerBytes = DataHeaderDevice.GetBytes(
+          startIndex * headSize,
+          count * headSize,
+          pin1);
+
+      for (var i = 0; i < count; ++i)
+      {
+        var headerOffset = i * headSize;
+        var targetIndex = destinationIndex + i;
+        keys[targetIndex] = KeySerializer.Deserialize(
+            headerBytes.Slice(headerOffset, KeySize));
+        var head = BinarySerializerHelper.FromByteArray<ValueHead>(
+            headerBytes,
+            headerOffset + KeySize);
+        values[targetIndex] = ValueSerializer.Deserialize(
+            DataDevice.GetBytes(
+                head.ValueOffset,
+                head.ValueLength,
+                pin2));
+      }
+
+      blockPin?.SetDevice1(pin1.Device);
+      blockPin?.SetDevice2(pin2.Device);
+      return count;
+    }
+    finally
+    {
+      Interlocked.Decrement(ref ReadCount);
+    }
+  }
+
   protected override void DeleteDevices()
   {
     DataHeaderDevice?.Delete();

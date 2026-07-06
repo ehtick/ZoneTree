@@ -32,6 +32,8 @@ public sealed class ZoneTreeIterator<TKey, TValue> : IZoneTreeIterator<TKey, TVa
 
   readonly bool IncludeBottomSegments;
 
+  readonly int DiskSegmentPrefetchSize;
+
   int Length;
 
   bool HasPrev;
@@ -85,7 +87,8 @@ public sealed class ZoneTreeIterator<TKey, TValue> : IZoneTreeIterator<TKey, TVa
       bool includeDeletedRecords,
       bool includeMutableSegment,
       bool includeDiskSegment,
-      bool includeBottomSegments)
+      bool includeBottomSegments,
+      int diskSegmentPrefetchSize)
   {
     IsDeleted = options.IsDeleted;
     Comparer = options.Comparer;
@@ -96,6 +99,7 @@ public sealed class ZoneTreeIterator<TKey, TValue> : IZoneTreeIterator<TKey, TVa
     IncludeDeletedRecords = includeDeletedRecords;
     IncludeMutableSegment = includeMutableSegment;
     IncludeDiskSegment = includeDiskSegment;
+    DiskSegmentPrefetchSize = diskSegmentPrefetchSize;
     if (autoRefresh)
       ZoneTree.OnMutableSegmentMovedForward += OnZoneTreeMutableSegmentMovedForward;
     ZoneTree.OnZoneTreeIsDisposing += OnZoneTreeIsDisposing;
@@ -246,7 +250,8 @@ public sealed class ZoneTreeIterator<TKey, TValue> : IZoneTreeIterator<TKey, TVa
             IncludeMutableSegment,
             IncludeDiskSegment,
             IncludeBottomSegments,
-            ContributeToTheBlockCache);
+            ContributeToTheBlockCache,
+            DiskSegmentPrefetchSize);
     DiskSegment = segments.DiskSegment;
     BottomSegments = segments.BottomSegments;
     SeekableIterators = segments.SeekableIterators;

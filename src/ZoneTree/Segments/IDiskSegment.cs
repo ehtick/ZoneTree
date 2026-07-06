@@ -116,4 +116,11 @@ public interface IDiskSegment<TKey, TValue> : IReadOnlySegment<TKey, TValue>, II
   /// </summary>
   /// <param name="defaultSparseArray"></param>
   void SetDefaultSparseArray(IReadOnlyList<SparseArrayEntry<TKey, TValue>> defaultSparseArray);
+
+  /// <summary>
+  /// Returns a seekable iterator over the segment.
+  /// </summary>
+  ISeekableIterator<TKey, TValue> GetSeekableIterator(
+      bool contributeToTheBlockCache,
+      int prefetchSize);
 }

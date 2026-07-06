@@ -373,7 +373,23 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
 
   public ISeekableIterator<TKey, TValue> GetSeekableIterator(bool contributeToTheBlockCache)
   {
-    return new SeekableIterator<TKey, TValue>(this, contributeToTheBlockCache);
+    return GetSeekableIterator(
+        contributeToTheBlockCache,
+        IteratorDefaultValues.DiskSegmentPrefetchSize);
+  }
+
+  public ISeekableIterator<TKey, TValue> GetSeekableIterator(
+      bool contributeToTheBlockCache,
+      int prefetchSize)
+  {
+    if (prefetchSize < 2)
+      return new SeekableIterator<TKey, TValue>(this, contributeToTheBlockCache);
+
+    return new PrefetchingSeekableIterator<TKey, TValue>(
+          this,
+          ReadEntries,
+          prefetchSize,
+          contributeToTheBlockCache);
   }
 
   public long GetLastSmallerOrEqualPosition(in TKey key)
@@ -498,4 +514,12 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
   {
     return ReadValue(index, blockPin);
   }
+
+  public abstract int ReadEntries(
+      long startIndex,
+      int count,
+      TKey[] keys,
+      TValue[] values,
+      int destinationIndex,
+      BlockPin blockPin);
 }
