@@ -11,6 +11,11 @@ try
     await RenderChartsAsync(renderJsonReportPath, CancellationToken.None);
     return;
   }
+  if (args is ["--render-markdown", var renderMarkdownJsonReportPath])
+  {
+    await RenderMarkdownAsync(renderMarkdownJsonReportPath, CancellationToken.None);
+    return;
+  }
 
   var config = BenchmarkConfig.Parse(args);
   ApplyCleanup(config);
@@ -87,6 +92,7 @@ static void PrintHelp()
         --mysql-user <user>
         --mysql-password <password>
         --render-charts <profile-store-report.json>
+        --render-markdown <profile-store-report.json>
         --update-latest
 
       Example:
@@ -129,22 +135,48 @@ static void DeleteDirectory(string path)
 
 static async Task RenderChartsAsync(string jsonReportPath, CancellationToken ct)
 {
+  var report = await ReadReportAsync(jsonReportPath, ct);
+  var charts = await BenchmarkChartWriter.WriteAsync(
+      report.Results,
+      report.Directory,
+      report.Stamp,
+      report.FilePrefix,
+      ct);
+  await ResultWriter.WriteMarkdownAsync(report.Results, report.MarkdownPath, charts, ct);
+  foreach (var chart in charts)
+    Console.WriteLine($"Wrote {Path.Combine(report.Directory, chart.FileName)}");
+  Console.WriteLine($"Wrote {report.MarkdownPath}");
+}
+
+static async Task RenderMarkdownAsync(string jsonReportPath, CancellationToken ct)
+{
+  var report = await ReadReportAsync(jsonReportPath, ct);
+  var charts = BenchmarkChartWriter.GetChartArtifacts(report.FilePrefix)
+      .Where(chart => File.Exists(Path.Combine(report.Directory, chart.FileName)))
+      .ToArray();
+  await ResultWriter.WriteMarkdownAsync(report.Results, report.MarkdownPath, charts, ct);
+  Console.WriteLine($"Wrote {report.MarkdownPath}");
+}
+
+static async Task<(string Directory, string FileName, string Stamp, string FilePrefix, string MarkdownPath, IReadOnlyList<BenchmarkResult> Results)> ReadReportAsync(
+    string jsonReportPath,
+    CancellationToken ct)
+{
   var directory = Path.GetDirectoryName(jsonReportPath);
   if (string.IsNullOrWhiteSpace(directory))
     directory = Directory.GetCurrentDirectory();
   var fileName = Path.GetFileNameWithoutExtension(jsonReportPath);
   var stamp = fileName.StartsWith("profile-store-", StringComparison.Ordinal)
       ? fileName["profile-store-".Length..]
-      : DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+      : fileName;
+  var filePrefix = fileName.StartsWith("profile-store-", StringComparison.Ordinal)
+      ? fileName
+      : stamp;
   var json = await File.ReadAllTextAsync(jsonReportPath, ct);
   var results = JsonSerializer.Deserialize<IReadOnlyList<BenchmarkResult>>(json)
       ?? throw new InvalidOperationException($"Could not read benchmark results from {jsonReportPath}.");
-  var charts = await BenchmarkChartWriter.WriteAsync(results, directory, stamp, ct);
   var markdownPath = Path.Combine(directory, $"{fileName}.md");
-  await ResultWriter.WriteMarkdownAsync(results, markdownPath, charts, ct);
-  foreach (var chart in charts)
-    Console.WriteLine($"Wrote {Path.Combine(directory, chart.FileName)}");
-  Console.WriteLine($"Wrote {markdownPath}");
+  return (directory, fileName, stamp, filePrefix, markdownPath, results);
 }
 
 static async Task UpdateLatestAsync(IReadOnlyList<BenchmarkResult> results, CancellationToken ct)

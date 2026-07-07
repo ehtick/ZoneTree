@@ -236,6 +236,13 @@ benchmark:
 dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --render-charts results/profiles-10000/profile-store-YYYYMMDD-HHMMSS.json
 ```
 
+To regenerate only the Markdown report from an existing JSON file without
+rewriting the JSON or SVG files:
+
+```bash
+dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --render-markdown results/profiles-10000/profile-store-YYYYMMDD-HHMMSS.json
+```
+
 To publish the current run as the committed latest reference:
 
 ```bash

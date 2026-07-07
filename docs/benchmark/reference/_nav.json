@@ -1,0 +1,19 @@
+{
+  "mode": "merge",
+  "sequence": [
+    "benchmark",
+    "100k/",
+    "500k/",
+    "1m/",
+    "2m/",
+    "5m/",
+    "10m/"
+  ],
+  "items": [
+    {
+      "id": "benchmark",
+      "title": "Performance Benchmark",
+      "path": "../"
+    }
+  ]
+}

@@ -87,12 +87,55 @@ public static class ResultWriter
   {
     var first = results[0];
     var writer = new StringWriter();
-    writer.WriteLine("# Profile Store Benchmark");
+    writer.WriteLine($"# Benchmark {FormatProfileCount(first.Workload.Profiles)} Profiles");
     writer.WriteLine();
-    writer.WriteLine("## Environment");
+    writer.WriteLine("## Charts");
     writer.WriteLine();
-    writer.WriteLine(first.Environment);
+    foreach (var chart in charts)
+    {
+      writer.WriteLine($"### {chart.Title}");
+      writer.WriteLine();
+      writer.WriteLine($"![{chart.Title}]({chart.FileName})");
+      writer.WriteLine();
+    }
+    writer.WriteLine("## Total By Engine");
     writer.WriteLine();
+    writer.WriteLine("| Engine | Status | Run time | Completed phase time | Pre-read stabilize | Post-update stabilize | Settle | Reopen | Verify | Storage | Process peak memory | Final checksum |");
+    writer.WriteLine("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+    foreach (var result in results)
+    {
+      var total = result.Phases.Sum(x => x.ElapsedMs);
+      writer.WriteLine($"| {result.Engine} | {FormatStatus(result)} | {FormatMilliseconds(result.RunElapsedMs)} | {FormatMilliseconds(total)} | {FormatMilliseconds(result.PreReadStabilizeMs)} | {FormatMilliseconds(result.PostUpdateStabilizeMs)} | {FormatMilliseconds(result.SettleMs)} | {FormatMilliseconds(result.ReopenMs)} | {FormatMilliseconds(result.VerifyMs)} | {FormatBytes(result.StorageSizeBytes)} | {FormatBytes(result.PeakProcessWorkingSetBytes)} | {FormatChecksum(result.VerifyChecksum)} |");
+    }
+    writer.WriteLine();
+    writer.WriteLine("## Correctness");
+    writer.WriteLine();
+    writer.WriteLine(FormatCorrectnessSummary(results));
+    writer.WriteLine();
+    writer.WriteLine("## Interpretation Notes");
+    writer.WriteLine();
+    foreach (var note in CreateInterpretationNotes(results))
+      writer.WriteLine($"* {note}");
+    writer.WriteLine();
+    writer.WriteLine("## Phase Results");
+    writer.WriteLine();
+    foreach (var result in results)
+    {
+      writer.WriteLine($"### {result.Engine}");
+      writer.WriteLine();
+      if (!string.IsNullOrWhiteSpace(result.InterruptedPhase))
+      {
+        writer.WriteLine($"Interrupted: {result.InterruptedPhase}");
+        writer.WriteLine();
+      }
+      writer.WriteLine("| Phase | Operations | Time | Throughput | Checksum |");
+      writer.WriteLine("| --- | ---: | ---: | ---: | --- |");
+      foreach (var phase in result.Phases)
+      {
+        writer.WriteLine($"| {phase.Name} | {FormatInteger(phase.Operations)} | {FormatMilliseconds(phase.ElapsedMs)} | {FormatInteger(phase.OperationsPerSecond)}/s | `{phase.Checksum}` |");
+      }
+      writer.WriteLine();
+    }
     writer.WriteLine("## Configuration");
     writer.WriteLine();
     writer.WriteLine($"* Profiles: {FormatInteger(first.Workload.Profiles)}");
@@ -109,6 +152,10 @@ public static class ResultWriter
     writer.WriteLine(first.Workload.TimeoutSeconds > 0
         ? $"* Timeout: {FormatInteger(first.Workload.TimeoutSeconds)} seconds per engine"
         : "* Timeout: disabled");
+    writer.WriteLine();
+    writer.WriteLine("## Environment");
+    writer.WriteLine();
+    writer.WriteLine(first.Environment);
     writer.WriteLine();
     writer.WriteLine("## Engine Settings");
     writer.WriteLine();
@@ -131,53 +178,6 @@ public static class ResultWriter
     writer.WriteLine();
     foreach (var result in results)
       writer.WriteLine($"* {result.Engine}: {result.Durability}");
-    writer.WriteLine();
-    writer.WriteLine("## Total By Engine");
-    writer.WriteLine();
-    writer.WriteLine("| Engine | Status | Run time | Completed phase time | Pre-read stabilize | Post-update stabilize | Settle | Reopen | Verify | Storage | Process peak memory | Final checksum |");
-    writer.WriteLine("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
-    foreach (var result in results)
-    {
-      var total = result.Phases.Sum(x => x.ElapsedMs);
-      writer.WriteLine($"| {result.Engine} | {FormatStatus(result)} | {FormatMilliseconds(result.RunElapsedMs)} | {FormatMilliseconds(total)} | {FormatMilliseconds(result.PreReadStabilizeMs)} | {FormatMilliseconds(result.PostUpdateStabilizeMs)} | {FormatMilliseconds(result.SettleMs)} | {FormatMilliseconds(result.ReopenMs)} | {FormatMilliseconds(result.VerifyMs)} | {FormatBytes(result.StorageSizeBytes)} | {FormatBytes(result.PeakProcessWorkingSetBytes)} | {FormatChecksum(result.VerifyChecksum)} |");
-    }
-    writer.WriteLine();
-    writer.WriteLine("## Correctness");
-    writer.WriteLine();
-    writer.WriteLine(FormatCorrectnessSummary(results));
-    writer.WriteLine();
-    writer.WriteLine("## Charts");
-    writer.WriteLine();
-    foreach (var chart in charts)
-    {
-      writer.WriteLine($"### {chart.Title}");
-      writer.WriteLine();
-      writer.WriteLine($"![{chart.Title}]({chart.FileName})");
-      writer.WriteLine();
-    }
-    writer.WriteLine("## Phase Results");
-    writer.WriteLine();
-    foreach (var result in results)
-    {
-      writer.WriteLine($"### {result.Engine}");
-      writer.WriteLine();
-      if (!string.IsNullOrWhiteSpace(result.InterruptedPhase))
-      {
-        writer.WriteLine($"Interrupted: {result.InterruptedPhase}");
-        writer.WriteLine();
-      }
-      writer.WriteLine("| Phase | Operations | Time | Throughput | Checksum |");
-      writer.WriteLine("| --- | ---: | ---: | ---: | --- |");
-      foreach (var phase in result.Phases)
-      {
-        writer.WriteLine($"| {phase.Name} | {FormatInteger(phase.Operations)} | {FormatMilliseconds(phase.ElapsedMs)} | {FormatInteger(phase.OperationsPerSecond)}/s | `{phase.Checksum}` |");
-      }
-      writer.WriteLine();
-    }
-    writer.WriteLine("## Interpretation Notes");
-    writer.WriteLine();
-    foreach (var note in CreateInterpretationNotes(results))
-      writer.WriteLine($"* {note}");
     return writer.ToString();
   }
 
@@ -264,6 +264,15 @@ public static class ResultWriter
 
   static string FormatInteger(long value) =>
       value.ToString("N0", CultureInfo.InvariantCulture).Replace(",", "_");
+
+  static string FormatProfileCount(int value)
+  {
+    if (value >= 1_000_000 && value % 1_000_000 == 0)
+      return $"{value / 1_000_000}M";
+    if (value >= 1_000 && value % 1_000 == 0)
+      return $"{value / 1_000}K";
+    return FormatInteger(value);
+  }
 
   static string FormatChecksum(string? checksum) =>
       checksum == null ? "n/a" : $"`{checksum}`";

@@ -1,0 +1,10 @@
+{
+  "mode": "override",
+  "root": "reference",
+  "items": [
+    {
+      "title": "Performance Benchmark",
+      "path": "."
+    }
+  ]
+}

@@ -58,6 +58,10 @@ For the storage model, start with [LSM Tree](concepts/lsm-tree.md). For ZoneTree
 * [Compression](storage/compression.md)
 * [Serializers and comparers](storage/serializers-and-comparers.md)
 
+## Benchmarks
+
+* [Profile store benchmark](benchmark/benchmark.md)
+
 ## Tuning
 
 * [Write amplification](tuning/write-amplification.md)

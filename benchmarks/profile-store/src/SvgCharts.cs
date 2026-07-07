@@ -89,6 +89,16 @@ public sealed class SvgChartBuilder(int width, int height, string title, string 
 
 public static class BenchmarkChartWriter
 {
+  public static IReadOnlyList<ChartArtifact> GetChartArtifacts(string filePrefix) =>
+  [
+    new ChartArtifact("Execution Time", $"{filePrefix}-execution-time.svg"),
+    new ChartArtifact("Write Throughput", $"{filePrefix}-write-throughput.svg"),
+    new ChartArtifact("Lookup Throughput", $"{filePrefix}-lookup-throughput.svg"),
+    new ChartArtifact("Index Scan Throughput", $"{filePrefix}-index-scan-throughput.svg"),
+    new ChartArtifact("Query Throughput", $"{filePrefix}-query-throughput.svg"),
+    new ChartArtifact("Resource Footprint", $"{filePrefix}-resources.svg")
+  ];
+
   public static async Task<IReadOnlyList<ChartArtifact>> WriteAsync(
       IReadOnlyList<BenchmarkResult> results,
       string outputDirectory,
@@ -99,30 +109,31 @@ public static class BenchmarkChartWriter
     if (string.IsNullOrWhiteSpace(filePrefix))
       filePrefix = $"profile-store-{stamp}";
 
+    var artifacts = GetChartArtifacts(filePrefix);
     var charts = new (ChartArtifact Artifact, string Svg)[]
     {
-      (new ChartArtifact("Execution Time", $"{filePrefix}-execution-time.svg"), CreateExecutionTime(results)),
-      (new ChartArtifact("Write Throughput", $"{filePrefix}-write-throughput.svg"), CreatePhaseThroughput(
+      (artifacts[0], CreateExecutionTime(results)),
+      (artifacts[1], CreatePhaseThroughput(
           results,
           "Write Throughput",
           "Grouped bars show relative throughput for insert and update phases; tallest bar per phase is 100%",
           ["insert profiles", "update profiles"])),
-      (new ChartArtifact("Lookup Throughput", $"{filePrefix}-lookup-throughput.svg"), CreatePhaseThroughput(
+      (artifacts[2], CreatePhaseThroughput(
           results,
           "Lookup Throughput",
           "Grouped bars show relative throughput for point and email lookups; tallest bar per phase is 100%",
           ["read by user id", "lookup by email", "post-update read by user id", "post-update lookup by email"])),
-      (new ChartArtifact("Index Scan Throughput", $"{filePrefix}-index-scan-throughput.svg"), CreatePhaseThroughput(
+      (artifacts[3], CreatePhaseThroughput(
           results,
           "Index Scan Throughput",
           "Grouped bars show relative throughput for index-only scans; tallest bar per phase is 100%",
           ["scan country/status index", "scan created-at index", "scan top reputation index", "post-update scan country/status index", "post-update scan top reputation index"])),
-      (new ChartArtifact("Query Throughput", $"{filePrefix}-query-throughput.svg"), CreatePhaseThroughput(
+      (artifacts[4], CreatePhaseThroughput(
           results,
           "Query Throughput",
           "Grouped bars show relative throughput for indexed queries that fetch profiles; tallest bar per phase is 100%",
           ["query country/status", "query created-at range", "query top reputation", "post-update query country/status", "post-update query top reputation"])),
-      (new ChartArtifact("Resource Footprint", $"{filePrefix}-resources.svg"), CreateResources(results))
+      (artifacts[5], CreateResources(results))
     };
 
     foreach (var chart in charts)
