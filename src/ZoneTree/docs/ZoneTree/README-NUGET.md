@@ -19,6 +19,10 @@ ZoneTree is a high-performance storage engine for ordered, persistent data. It i
 Modern data systems are not built on features alone.
 They are built on storage layers that shape performance, reliability, and product architecture.
 
+![2M profile store benchmark execution time](https://raw.githubusercontent.com/ZoneTree/ZoneTree/main/docs/benchmark/reference/2m/latest-execution-time.svg)
+
+In a live 2M-profile benchmark with individual writes, secondary indexes, point reads, ordered scans, queries, and updates, ZoneTree completes the measured workload phases substantially faster than RocksDB, SQLite, and MySQL for this embedded profile-store scenario. See the full benchmark explanation and reference reports at [zonetree.dev/docs/benchmark](https://zonetree.dev/docs/benchmark/).
+
 .NET has excellent databases and frameworks, but very few native storage engines that can be used as a foundation for building new data systems.
 
 ZoneTree fills that layer.
@@ -259,47 +263,6 @@ ZoneTree uses async compressed WAL by default. It is the recommended starting po
 Disk segments can also use compression and different segment layouts. These options help tune disk space, read patterns, merge behavior, and file-size boundaries.
 
 For long-running services, ZoneTree also supports live backup for built-in non-transactional trees. Live backup creates complete backup generations while the tree remains open for reads and writes, and local backup generations can be restored through `ZoneTreeFactory`.
-
----
-
-## Performance
-
-ZoneTree is built for high-throughput workloads.
-
-The repository includes benchmark results covering large insert, load, merge, and iteration scenarios across different key/value types and write-ahead log modes.
-
-In the included insert benchmarks, ZoneTree performs significantly faster than RocksDB on the tested workloads.
-
-| Insert Benchmarks                         | 1M     | 2M       | 3M       | 10M      |
-| ----------------------------------------- | ------ | -------- | -------- | -------- |
-| **int-int ZoneTree async-compressed WAL** | 267 ms | 464 ms   | 716 ms   | 2693 ms  |
-| **int-int ZoneTree sync-compressed WAL**  | 834 ms | 1617 ms  | 2546 ms  | 8642 ms  |
-| **int-int ZoneTree sync WAL**             | 2742 ms | 5533 ms | 8242 ms  | 27497 ms |
-| **str-str ZoneTree async-compressed WAL** | 892 ms | 1833 ms  | 2711 ms  | 9443 ms  |
-| **str-str ZoneTree sync-compressed WAL**  | 1752 ms | 3397 ms | 5070 ms  | 19153 ms |
-| **str-str ZoneTree sync WAL**             | 3488 ms | 7002 ms | 10483 ms | 38727 ms |
-| **int-int RocksDB sync-compressed WAL**   | 8059 ms | 16188 ms | 23599 ms | 61947 ms |
-| **str-str RocksDB sync-compressed WAL**   | 8215 ms | 16146 ms | 23760 ms | 72491 ms |
-
-Performance depends on workload and configuration, including:
-
-* key and value types
-* serializers
-* comparer behavior
-* write-ahead log mode
-* compression settings
-* mutable segment size
-* disk segment mode
-* storage hardware
-* merge and maintenance configuration
-
-See the benchmark results:
-
-* [BenchmarkForAllModes.txt](https://github.com/ZoneTree/ZoneTree/blob/main/src/Playground/BenchmarkForAllModes.txt)
-
-Benchmark results vary with data shape, configuration, and hardware. Review the full benchmark file for details.
-
----
 
 ## What can be built with ZoneTree?
 
