@@ -85,7 +85,7 @@ These settings are meant to compare practical service configurations, not identi
 
 `Process peak memory` is measured from the benchmark process. For embedded engines, this includes the engine inside the benchmark process. For MySQL, it does not include the server process.
 
-Peak memory is a high-water mark, not steady-state memory usage. For ZoneTree, it can include temporary and cache residency such as decompressed disk blocks, and the .NET runtime may not return memory to the operating system immediately after a phase finishes.
+Peak memory is a high-water mark, not steady-state memory usage. During reads and scans, ZoneTree can cache decompressed disk blocks in memory; blocks that are not accessed within the configured cache lifetime are released by maintenance. After release, the .NET runtime may keep the reserved memory region available for reuse instead of immediately returning it to the operating system.
 
 `Index scan throughput` measures index-only scans. `Query throughput` measures scans that also fetch profile records.
 
