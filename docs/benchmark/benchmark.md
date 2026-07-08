@@ -99,7 +99,7 @@ In the available reference reports, ZoneTree shows strong performance for this l
 * fast ordered index scans and profile-fetching indexed queries,
 * compact storage compared with RocksDB and SQLite on the same generated data.
 
-The main tradeoff visible in the reports is memory. ZoneTree uses more benchmark-process memory in exchange for very high read, write, and query throughput.
+The main tradeoff visible in the reports is memory. ZoneTree uses more benchmark-process memory in exchange for very high read, write, and query throughput. This is intentional and configurable; for example, disk block cache lifetime controls how long hot blocks stay in memory. Also, .NET process peak memory is a high-water mark, so it does not mean ZoneTree actively uses all of that memory for the whole run.
 
 ## Reproduce The Benchmark
 
