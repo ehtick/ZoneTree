@@ -16,6 +16,7 @@ Reference reports include the exact machine, configuration, phase timings, check
 | 2M | [2M reference](reference/2m/2m.md) |
 | 5M | [5M reference](reference/5m/5m.md) |
 | 10M | [10M reference](reference/10m/10m.md) |
+| 20M | [20M reference](reference/20m/20m.md) |
 
 The reference reports should be treated as evidence for this exact workload, hardware, operating system, .NET runtime, engine configuration, and durability profile. Results can change with CPU, storage, memory pressure, compression settings, WAL settings, segment sizing, and query distribution.
 
@@ -83,6 +84,8 @@ These settings are meant to compare practical service configurations, not identi
 `Storage` is measured after the engine settles or checkpoints its data.
 
 `Process peak memory` is measured from the benchmark process. For embedded engines, this includes the engine inside the benchmark process. For MySQL, it does not include the server process.
+
+Peak memory is a high-water mark, not steady-state memory usage. For ZoneTree, it can include temporary and cache residency such as decompressed disk blocks, and the .NET runtime may not return memory to the operating system immediately after a phase finishes.
 
 `Index scan throughput` measures index-only scans. `Query throughput` measures scans that also fetch profile records.
 
