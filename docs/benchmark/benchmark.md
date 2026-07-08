@@ -16,6 +16,7 @@ Reference reports include the exact machine, configuration, phase timings, check
 | 2M | [2M reference](reference/2m/2m.md) |
 | 5M | [5M reference](reference/5m/5m.md) |
 | 10M | [10M reference](reference/10m/10m.md) |
+| 20M | [20M reference](reference/20m/20m.md) |
 
 The reference reports should be treated as evidence for this exact workload, hardware, operating system, .NET runtime, engine configuration, and durability profile. Results can change with CPU, storage, memory pressure, compression settings, WAL settings, segment sizing, and query distribution.
 
@@ -84,6 +85,8 @@ These settings are meant to compare practical service configurations, not identi
 
 `Process peak memory` is measured from the benchmark process. For embedded engines, this includes the engine inside the benchmark process. For MySQL, it does not include the server process.
 
+Peak memory is a high-water mark, not steady-state memory usage. During reads and scans, ZoneTree can cache decompressed disk blocks in memory; blocks that are not accessed within the configured cache lifetime are released by maintenance. After release, the .NET runtime may keep the reserved memory region available for reuse instead of immediately returning it to the operating system.
+
 `Index scan throughput` measures index-only scans. `Query throughput` measures scans that also fetch profile records.
 
 ## Current Takeaways
@@ -96,7 +99,7 @@ In the available reference reports, ZoneTree shows strong performance for this l
 * fast ordered index scans and profile-fetching indexed queries,
 * compact storage compared with RocksDB and SQLite on the same generated data.
 
-The main tradeoff visible in the reports is memory. ZoneTree uses more benchmark-process memory in exchange for very high read, write, and query throughput.
+The main tradeoff visible in the reports is memory. ZoneTree uses more benchmark-process memory in exchange for very high read, write, and query throughput. This is intentional and configurable; for example, disk block cache lifetime controls how long hot blocks stay in memory. Also, .NET process peak memory is a high-water mark, so it does not mean ZoneTree actively uses all of that memory for the whole run.
 
 ## Reproduce The Benchmark
 

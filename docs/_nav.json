@@ -1,4 +1,5 @@
 {
+  "pageLinks": true,
   "icons": {
     "index.md": "iconoir:home",
     "getting-started.md": "iconoir:rocket",
