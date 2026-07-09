@@ -132,6 +132,8 @@ zoneTree.TryAtomicAddOrUpdate(
     });
 ```
 
+For mutable reference values, assigning a new object in the updater is the safest pattern. Add/update delegates may be retried, so in-place mutations should be idempotent and side effects should be repeatable.
+
 Plain `Upsert` is the fastest write path. Atomic methods are synchronized with other atomic methods and are intended for operations that must read, decide, and write as one logical action.
 
 For normal concurrent writes, use the regular write APIs. They are designed for high-throughput use. Choose atomic methods only when the new value depends on the existing value.
