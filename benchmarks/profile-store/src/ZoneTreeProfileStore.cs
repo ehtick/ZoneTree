@@ -16,6 +16,7 @@ public sealed class ZoneTreeProfileStore : IProfileStoreEngine
   IZoneTree<string, long>? CreatedAtIndex;
   IZoneTree<string, long>? ReputationIndex;
   readonly List<IMaintainer> Maintainers = [];
+  readonly List<Action> DetachMaintenanceHandlers = [];
   int MutableSegmentMaxItemCount;
   int SparseArrayStepSize;
   int KeyCacheSize;
@@ -48,12 +49,13 @@ public sealed class ZoneTreeProfileStore : IProfileStoreEngine
     CountryStatusIndex = OpenStringLongTree(Path.Combine(RootDirectory, "country-status-index"), MutableSegmentMaxItemCount, SparseArrayStepSize, KeyCacheSize, ValueCacheSize);
     CreatedAtIndex = OpenStringLongTree(Path.Combine(RootDirectory, "created-at-index"), MutableSegmentMaxItemCount, SparseArrayStepSize, KeyCacheSize, ValueCacheSize);
     ReputationIndex = OpenStringLongTree(Path.Combine(RootDirectory, "reputation-index"), MutableSegmentMaxItemCount, SparseArrayStepSize, KeyCacheSize, ValueCacheSize);
+    DetachMaintainerHandlers();
     Maintainers.Clear();
-    AddMaintainer(Profiles.CreateMaintainer());
-    AddMaintainer(EmailIndex.CreateMaintainer());
-    AddMaintainer(CountryStatusIndex.CreateMaintainer());
-    AddMaintainer(CreatedAtIndex.CreateMaintainer());
-    AddMaintainer(ReputationIndex.CreateMaintainer());
+    AddMaintainer(Profiles);
+    AddMaintainer(EmailIndex);
+    AddMaintainer(CountryStatusIndex);
+    AddMaintainer(CreatedAtIndex);
+    AddMaintainer(ReputationIndex);
     return Task.CompletedTask;
   }
 
@@ -185,6 +187,7 @@ public sealed class ZoneTreeProfileStore : IProfileStoreEngine
     {
       await maintainer.WaitForBackgroundThreadsAsync();
     }
+    DetachMaintainerHandlers();
     foreach (var maintainer in Maintainers)
       maintainer.Dispose();
     Maintainers.Clear();
@@ -323,11 +326,33 @@ public sealed class ZoneTreeProfileStore : IProfileStoreEngine
     });
   }
 
-  void AddMaintainer(IMaintainer maintainer)
+  void AddMaintainer<TKey, TValue>(IZoneTree<TKey, TValue> tree)
   {
+    var maintainer = tree.CreateMaintainer();
     maintainer.BlockCacheLifeTime = BlockCacheLifeTime;
     maintainer.InactiveBlockCacheCleanupInterval = TimeSpan.FromMilliseconds(BlockCacheLifeTime.TotalMilliseconds / 2);
+
+    void onDiskSegmentActivated(
+      IZoneTreeMaintenance<TKey, TValue> maintenance,
+      ZoneTree.Segments.IDiskSegment<TKey, TValue> _,
+      bool isBottomSegment)
+    {
+      if (maintenance.IsBottomSegmentsMerging ||
+          maintenance.BottomSegments.Count < 2)
+        return;
+      maintainer.StartBottomSegmentsMerge();
+    }
+    tree.Maintenance.OnDiskSegmentActivated += onDiskSegmentActivated;
+    DetachMaintenanceHandlers.Add(() =>
+        tree.Maintenance.OnDiskSegmentActivated -= onDiskSegmentActivated);
     Maintainers.Add(maintainer);
+  }
+
+  void DetachMaintainerHandlers()
+  {
+    foreach (var detach in DetachMaintenanceHandlers)
+      detach();
+    DetachMaintenanceHandlers.Clear();
   }
 
   static long GetDirectorySize(string path)

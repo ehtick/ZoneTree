@@ -17,6 +17,8 @@ Reference reports include the exact machine, configuration, phase timings, check
 | 5M | [5M reference](reference/5m/5m.md) |
 | 10M | [10M reference](reference/10m/10m.md) |
 | 20M | [20M reference](reference/20m/20m.md) |
+| 50M | [50M reference](reference/50m/50m.md) |
+| 100M | [100M reference](reference/100m/100m.md) |
 
 The reference reports should be treated as evidence for this exact workload, hardware, operating system, .NET runtime, engine configuration, and durability profile. Results can change with CPU, storage, memory pressure, compression settings, WAL settings, segment sizing, and query distribution.
 
