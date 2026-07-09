@@ -305,6 +305,7 @@ public sealed class BenchmarkRunner(BenchmarkConfig config)
         ["ValueCacheSize"] = config.ZoneTreeValueCacheSize.ToString(),
         ["IteratorPrefetchSize"] = config.ZoneTreeIteratorPrefetchSize.ToString(),
         ["BlockCacheLifeTime"] = $"{config.ZoneTreeBlockCacheLifeTimeMinutes} minutes",
+        ["BottomMergePolicy"] = "Full bottom merge when bottom segment count exceeds 1",
         ["ReadStabilization"] = "Settle before read/query phases"
       },
       "SQLite" => new Dictionary<string, string>
