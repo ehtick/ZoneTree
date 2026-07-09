@@ -1185,6 +1185,8 @@ public sealed class LiveBackupTests
   sealed class CatalogTrackingLiveBackupProvider
       : InMemoryLiveBackupProvider
   {
+    readonly Lock SyncRoot = new();
+
     readonly HashSet<string> Files = new(StringComparer.Ordinal);
 
     int FileUploads;
@@ -1202,8 +1204,10 @@ public sealed class LiveBackupTests
         CancellationToken cancellationToken)
     {
       cancellationToken.ThrowIfCancellationRequested();
+      ArgumentNullException.ThrowIfNull(file);
       Interlocked.Increment(ref FileUploads);
-      Files.Add(file.SegmentId.ToString());
+      lock (SyncRoot)
+        Files.Add(file.FileName);
       return Task.CompletedTask;
     }
 
@@ -1213,8 +1217,10 @@ public sealed class LiveBackupTests
         CancellationToken cancellationToken)
     {
       cancellationToken.ThrowIfCancellationRequested();
+      ArgumentNullException.ThrowIfNull(file);
       Interlocked.Increment(ref UseSegmentCalls);
-      return Task.FromResult(!Files.Contains(file.SegmentId.ToString()));
+      lock (SyncRoot)
+        return Task.FromResult(!Files.Contains(file.FileName));
     }
   }
 
