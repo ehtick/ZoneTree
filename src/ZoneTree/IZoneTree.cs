@@ -116,7 +116,9 @@ public interface IZoneTree<TKey, TValue> : IDisposable
 
   /// <summary>
   /// Attempts to add or update the specified key and value atomically across LSM-Tree segments  and calls the result delegate atomically.
-  /// valueUpdater can be called one or more times.
+  /// valueUpdater can be called one or more times. Keep it deterministic and avoid side effects that cannot be repeated.
+  /// When TValue is a mutable reference type, assigning a new object is the safest pattern.
+  /// In-place mutation should be idempotent and must not be followed by cancellation.
   /// </summary>
   /// <param name="key">The key of the element to add.</param>
   /// <param name="valueToAdd">The value of the element to add. It can be null.</param>
@@ -133,10 +135,12 @@ public interface IZoneTree<TKey, TValue> : IDisposable
   /// <summary>
   /// Attempts to add or update the specified key and value atomically across LSM-Tree segments and calls the result delegate atomically.
   /// valueAdder can be called one or more times.
-  /// valueUpdater can be called one or more times.
+  /// valueUpdater can be called one or more times. Keep delegates deterministic and avoid side effects that cannot be repeated.
+  /// When TValue is a mutable reference type, assigning a new object is the safest pattern.
+  /// In-place mutation should be idempotent and must not be followed by cancellation.
   /// </summary>
   /// <param name="key">The key of the element to add.</param>
-  /// <param name="valueAdder">he delegate function that adds the value.</param>
+  /// <param name="valueAdder">The delegate function that adds the value.</param>
   /// <param name="valueUpdater">The delegate function that updates the value.</param>
   /// <param name="result">The operation result delegate.</param>
   /// <returns>true if the key/value pair was added;

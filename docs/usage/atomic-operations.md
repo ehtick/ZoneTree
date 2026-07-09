@@ -117,7 +117,9 @@ Return `true` to commit the local value. Return `false` to cancel the write.
 
 Keep delegates and result callbacks short and deterministic. `TryAtomicAddOrUpdate` may retry when the mutable segment is frozen or full, so adder/updater delegates can be invoked more than once before the method finishes. Avoid external side effects inside those delegates unless repeating the side effect is acceptable.
 
-For mutable reference types, decide before mutating. Returning `false` prevents ZoneTree from writing a new value, but it cannot undo in-place changes already made to a shared object reference.
+For mutable reference types, assigning a new object to the `ref` parameter is the safest pattern. In-place mutation can be acceptable when the change is idempotent, repeatable, and never cancelled after mutation. It still changes the shared object immediately, before ZoneTree has necessarily accepted the write, assigned an operation index, and appended the WAL record.
+
+Returning `false` prevents ZoneTree from writing a new value, but it cannot undo in-place changes already made to a shared object reference.
 
 ```csharp
 zoneTree.TryAtomicGetAndUpdate(1, out var user, (ref UserSnapshot value) =>

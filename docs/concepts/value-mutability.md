@@ -75,7 +75,9 @@ Reference types are still valid for large or complex values. Prefer immutable cl
 
 Atomic update delegates receive a local `TValue` variable by `ref`. They are the controlled place where a value can be transformed as part of a ZoneTree write.
 
-For value types, this is direct. For mutable reference types, in-place mutation is valid when the delegate commits by returning `true`.
+For value types, this is direct. For mutable reference types, assigning a new object to the `ref` parameter is the safest pattern. In-place mutation can be acceptable when the change is idempotent, repeatable, and never cancelled after mutation.
+
+Some atomic methods can retry before they finish. If a delegate mutates an existing reference-type value in place, the shared object changes immediately, before ZoneTree has necessarily accepted the write, assigned an operation index, and appended the WAL record.
 
 The cancellation case is the trap. Returning `false` tells ZoneTree not to write the local value back. If the delegate mutates a shared reference object before returning `false`, the object may already have changed in memory.
 
@@ -92,18 +94,4 @@ zoneTree.TryAtomicGetAndUpdate(1, out var user, (ref UserSnapshot value) =>
 });
 ```
 
-In-place mutation is fine when the update is definitely committed:
-
-```csharp
-zoneTree.TryAtomicGetAndUpdate(1, out var user, (ref User value) =>
-{
-    if (!ShouldRename(value))
-        return false;
-
-    value.Name = "Bob";
-    return true;
-});
-```
-
 Returning `false` should mean the delegate made no observable change.
-
