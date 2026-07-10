@@ -47,6 +47,9 @@ are supported, for example `--profiles 10000,100K,500K,1M,2M,10M`.
 
 ## Run Locally
 
+For a Linux host setup without Docker, see
+[bare-metal-server-setup.md](bare-metal-server-setup.md).
+
 Start MySQL separately if you want to include it. A ready-to-paste Docker setup
 is available in [mysql-benchmark-tuning.md](mysql-benchmark-tuning.md). Then run:
 
