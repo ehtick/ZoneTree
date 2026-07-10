@@ -1,0 +1,613 @@
+[
+  {
+    "Engine": "ZoneTree",
+    "Durability": "AsyncCompressed WAL default; MutableSegmentMaxItemCount=250000; SparseArrayStepSize=16; KeyCacheSize=1024; ValueCacheSize=1024; IteratorPrefetchSize=16; BlockCacheLifeTime=1 minutes; application-managed secondary indexes; background maintainers enabled.",
+    "StartedAtUtc": "2026-07-10T06:26:36.2127796Z",
+    "Workload": {
+      "Profiles": 1000000,
+      "ReadCount": 1000000,
+      "EmailReadCount": 1000000,
+      "QueryCount": 250000,
+      "UpdateCount": 1000000,
+      "PostReadCount": 1000000,
+      "PostEmailReadCount": 1000000,
+      "PostQueryCount": 250000,
+      "QueryLimit": 100,
+      "Seed": 570123434,
+      "TimeoutSeconds": 120000
+    },
+    "EngineSettings": {
+      "MutableSegmentMaxItemCount": "250000",
+      "SparseArrayStepSize": "16",
+      "KeyCacheSize": "1024",
+      "ValueCacheSize": "1024",
+      "IteratorPrefetchSize": "16",
+      "BlockCacheLifeTime": "1 minutes",
+      "BottomMergePolicy": "Full bottom merge when bottom segment count exceeds 1",
+      "ReadStabilization": "Settle before read/query phases"
+    },
+    "Completed": true,
+    "Status": "Completed",
+    "Phases": [
+      {
+        "Name": "insert profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 4904.998,
+        "OperationsPerSecond": 203873.68149793334,
+        "Checksum": "70EEB1E90366F6E5"
+      },
+      {
+        "Name": "read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 963.9319,
+        "OperationsPerSecond": 1037417.6847970277,
+        "Checksum": "0FB577C390019AC8"
+      },
+      {
+        "Name": "lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 2179.4808,
+        "OperationsPerSecond": 458824.872419156,
+        "Checksum": "9C199CC596F7AC10"
+      },
+      {
+        "Name": "scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 1691.2728,
+        "OperationsPerSecond": 147817.6672621945,
+        "Checksum": "B3350AAEFBCE068F"
+      },
+      {
+        "Name": "query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 12735.0437,
+        "OperationsPerSecond": 19630.87099575481,
+        "Checksum": "11A194A99CB7D634"
+      },
+      {
+        "Name": "scan created-at index",
+        "Operations": 250000,
+        "ElapsedMs": 1726.7523,
+        "OperationsPerSecond": 144780.46445920473,
+        "Checksum": "E3FE4E613ABE23A5"
+      },
+      {
+        "Name": "query created-at range",
+        "Operations": 250000,
+        "ElapsedMs": 11107.4604,
+        "OperationsPerSecond": 22507.39511977013,
+        "Checksum": "B8595B9702849552"
+      },
+      {
+        "Name": "scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 1126.7486,
+        "OperationsPerSecond": 221877.35578282503,
+        "Checksum": "FD457DADD7424105"
+      },
+      {
+        "Name": "query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 8508.5266,
+        "OperationsPerSecond": 29382.290466130766,
+        "Checksum": "B472892F8C7EF235"
+      },
+      {
+        "Name": "update profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 10269.6068,
+        "OperationsPerSecond": 97374.71156149814,
+        "Checksum": "2440ADD57E65500B"
+      },
+      {
+        "Name": "post-update read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 899.482,
+        "OperationsPerSecond": 1111750.9855672487,
+        "Checksum": "7DB9AA24CC9A8B8E"
+      },
+      {
+        "Name": "post-update lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 2123.4329,
+        "OperationsPerSecond": 470935.5308566614,
+        "Checksum": "43569B6DA38ACCB5"
+      },
+      {
+        "Name": "post-update scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 1496.5135,
+        "OperationsPerSecond": 167054.95807421717,
+        "Checksum": "896A595A5F979F99"
+      },
+      {
+        "Name": "post-update query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 12925.1285,
+        "OperationsPerSecond": 19342.167468586482,
+        "Checksum": "EF5D80897CBF7824"
+      },
+      {
+        "Name": "post-update scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 1130.344,
+        "OperationsPerSecond": 221171.60793528342,
+        "Checksum": "905E8A81EE9017E5"
+      },
+      {
+        "Name": "post-update query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 8220.9554,
+        "OperationsPerSecond": 30410.09077850003,
+        "Checksum": "1A17E74A9E34D635"
+      }
+    ],
+    "RunElapsedMs": 86869.5449,
+    "PreReadStabilizeMs": 1765.0125,
+    "PostUpdateStabilizeMs": 2367.5675,
+    "SettleMs": 95.1256,
+    "StorageSizeBytes": 77004597,
+    "ReopenMs": 156.4974,
+    "VerifyMs": 8.3516,
+    "VerifyChecksum": "B7578931045C8FC5",
+    "PeakProcessWorkingSetBytes": 2699980800,
+    "Environment": "* OS: Ubuntu 24.04.3 LTS\n* Architecture: X64\n* .NET: 10.0.9\n* CPU: AMD EPYC 4345P 8-Core Processor\n* Logical processors: 16\n* Total available memory: 60.4 GB\n* Initial process working set: 115.4 MB",
+    "InterruptedPhase": null
+  },
+  {
+    "Engine": "RocksDB",
+    "Durability": "WAL enabled; five separate RocksDB instances; no WriteBatch across indexes; compression=Zstd; write_buffer_size=1024 MB per database; max_write_buffer_number=4.",
+    "StartedAtUtc": "2026-07-10T06:28:03.4151953Z",
+    "Workload": {
+      "Profiles": 1000000,
+      "ReadCount": 1000000,
+      "EmailReadCount": 1000000,
+      "QueryCount": 250000,
+      "UpdateCount": 1000000,
+      "PostReadCount": 1000000,
+      "PostEmailReadCount": 1000000,
+      "PostQueryCount": 250000,
+      "QueryLimit": 100,
+      "Seed": 570123434,
+      "TimeoutSeconds": 120000
+    },
+    "EngineSettings": {
+      "Databases": "profiles,email-index,country-status-index,created-at-index,reputation-index",
+      "Compression": "Zstd",
+      "WriteBufferMb": "1024",
+      "MaxWriteBufferNumber": "4",
+      "WriteSync": "false",
+      "ReadStabilization": "Compact before read/query phases"
+    },
+    "Completed": true,
+    "Status": "Completed",
+    "Phases": [
+      {
+        "Name": "insert profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 5355.3265,
+        "OperationsPerSecond": 186729.9780881707,
+        "Checksum": "70EEB1E90366F6E5"
+      },
+      {
+        "Name": "read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 3548.1133,
+        "OperationsPerSecond": 281839.9288433095,
+        "Checksum": "0FB577C390019AC8"
+      },
+      {
+        "Name": "lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 6739.491,
+        "OperationsPerSecond": 148379.15801059754,
+        "Checksum": "9C199CC596F7AC10"
+      },
+      {
+        "Name": "scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 2983.6523,
+        "OperationsPerSecond": 83789.92418117888,
+        "Checksum": "B3350AAEFBCE068F"
+      },
+      {
+        "Name": "query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 29568.3694,
+        "OperationsPerSecond": 8454.98095001478,
+        "Checksum": "11A194A99CB7D634"
+      },
+      {
+        "Name": "scan created-at index",
+        "Operations": 250000,
+        "ElapsedMs": 4291.1529,
+        "OperationsPerSecond": 58259.4015701468,
+        "Checksum": "E3FE4E613ABE23A5"
+      },
+      {
+        "Name": "query created-at range",
+        "Operations": 250000,
+        "ElapsedMs": 32592.4668,
+        "OperationsPerSecond": 7670.484150036782,
+        "Checksum": "B8595B9702849552"
+      },
+      {
+        "Name": "scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 2783.0294,
+        "OperationsPerSecond": 89830.1685206775,
+        "Checksum": "FD457DADD7424105"
+      },
+      {
+        "Name": "query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 29008.245,
+        "OperationsPerSecond": 8618.239400556635,
+        "Checksum": "B472892F8C7EF235"
+      },
+      {
+        "Name": "update profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 13907.539,
+        "OperationsPerSecond": 71903.44747550231,
+        "Checksum": "2440ADD57E65500B"
+      },
+      {
+        "Name": "post-update read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 3607.7879,
+        "OperationsPerSecond": 277178.156731442,
+        "Checksum": "7DB9AA24CC9A8B8E"
+      },
+      {
+        "Name": "post-update lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 6818.8036,
+        "OperationsPerSecond": 146653.2926685262,
+        "Checksum": "43569B6DA38ACCB5"
+      },
+      {
+        "Name": "post-update scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 2927.7389,
+        "OperationsPerSecond": 85390.1281975657,
+        "Checksum": "896A595A5F979F99"
+      },
+      {
+        "Name": "post-update query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 30163.4161,
+        "OperationsPerSecond": 8288.18589947443,
+        "Checksum": "EF5D80897CBF7824"
+      },
+      {
+        "Name": "post-update scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 2767.8079,
+        "OperationsPerSecond": 90324.18759986918,
+        "Checksum": "905E8A81EE9017E5"
+      },
+      {
+        "Name": "post-update query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 29263.0046,
+        "OperationsPerSecond": 8543.21022114045,
+        "Checksum": "1A17E74A9E34D635"
+      }
+    ],
+    "RunElapsedMs": 211241.7737,
+    "PreReadStabilizeMs": 1634.2772,
+    "PostUpdateStabilizeMs": 2809.4109,
+    "SettleMs": 0.3283,
+    "StorageSizeBytes": 328535422,
+    "ReopenMs": 44.1389,
+    "VerifyMs": 181.0732,
+    "VerifyChecksum": "B7578931045C8FC5",
+    "PeakProcessWorkingSetBytes": 670453760,
+    "Environment": "* OS: Ubuntu 24.04.3 LTS\n* Architecture: X64\n* .NET: 10.0.9\n* CPU: AMD EPYC 4345P 8-Core Processor\n* Logical processors: 16\n* Total available memory: 60.4 GB\n* Initial process working set: 115.1 MB",
+    "InterruptedPhase": null
+  },
+  {
+    "Engine": "SQLite",
+    "Durability": "WAL journal mode; synchronous=NORMAL; cache=1024 MB; mmap=1024 MB; native SQL indexes; single-row writes use autocommit.",
+    "StartedAtUtc": "2026-07-10T06:31:34.9809742Z",
+    "Workload": {
+      "Profiles": 1000000,
+      "ReadCount": 1000000,
+      "EmailReadCount": 1000000,
+      "QueryCount": 250000,
+      "UpdateCount": 1000000,
+      "PostReadCount": 1000000,
+      "PostEmailReadCount": 1000000,
+      "PostQueryCount": 250000,
+      "QueryLimit": 100,
+      "Seed": 570123434,
+      "TimeoutSeconds": 120000
+    },
+    "EngineSettings": {
+      "JournalMode": "WAL",
+      "Synchronous": "NORMAL",
+      "CacheMb": "1024",
+      "MmapMb": "1024",
+      "TempStore": "MEMORY"
+    },
+    "Completed": true,
+    "Status": "Completed",
+    "Phases": [
+      {
+        "Name": "insert profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 219595.9614,
+        "OperationsPerSecond": 4553.81780987526,
+        "Checksum": "70EEB1E90366F6E5"
+      },
+      {
+        "Name": "read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 2445.8839,
+        "OperationsPerSecond": 408850.1502462974,
+        "Checksum": "0FB577C390019AC8"
+      },
+      {
+        "Name": "lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 3457.857,
+        "OperationsPerSecond": 289196.45896287786,
+        "Checksum": "9C199CC596F7AC10"
+      },
+      {
+        "Name": "scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 4417.0893,
+        "OperationsPerSecond": 56598.35765602475,
+        "Checksum": "B3350AAEFBCE068F"
+      },
+      {
+        "Name": "query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 28739.2848,
+        "OperationsPerSecond": 8698.894274501918,
+        "Checksum": "11A194A99CB7D634"
+      },
+      {
+        "Name": "scan created-at index",
+        "Operations": 250000,
+        "ElapsedMs": 4362.7554,
+        "OperationsPerSecond": 57303.23547361835,
+        "Checksum": "E3FE4E613ABE23A5"
+      },
+      {
+        "Name": "query created-at range",
+        "Operations": 250000,
+        "ElapsedMs": 26320.1629,
+        "OperationsPerSecond": 9498.421455438636,
+        "Checksum": "B8595B9702849552"
+      },
+      {
+        "Name": "scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 3735.3696,
+        "OperationsPerSecond": 66927.78139009324,
+        "Checksum": "FD457DADD7424105"
+      },
+      {
+        "Name": "query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 27227.5241,
+        "OperationsPerSecond": 9181.885179196297,
+        "Checksum": "B472892F8C7EF235"
+      },
+      {
+        "Name": "update profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 163693.6833,
+        "OperationsPerSecond": 6108.971218927908,
+        "Checksum": "2440ADD57E65500B"
+      },
+      {
+        "Name": "post-update read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 2444.4124,
+        "OperationsPerSecond": 409096.27197112894,
+        "Checksum": "7DB9AA24CC9A8B8E"
+      },
+      {
+        "Name": "post-update lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 3462.494,
+        "OperationsPerSecond": 288809.16472346237,
+        "Checksum": "43569B6DA38ACCB5"
+      },
+      {
+        "Name": "post-update scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 4363.7599,
+        "OperationsPerSecond": 57290.04476162862,
+        "Checksum": "896A595A5F979F99"
+      },
+      {
+        "Name": "post-update query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 28786.3649,
+        "OperationsPerSecond": 8684.667232853704,
+        "Checksum": "EF5D80897CBF7824"
+      },
+      {
+        "Name": "post-update scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 3750.5476,
+        "OperationsPerSecond": 66656.93297693382,
+        "Checksum": "905E8A81EE9017E5"
+      },
+      {
+        "Name": "post-update query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 27395.7056,
+        "OperationsPerSecond": 9125.517832984744,
+        "Checksum": "1A17E74A9E34D635"
+      }
+    ],
+    "RunElapsedMs": 554393.9456,
+    "PreReadStabilizeMs": null,
+    "PostUpdateStabilizeMs": null,
+    "SettleMs": 127.6719,
+    "StorageSizeBytes": 298430464,
+    "ReopenMs": 0.4054,
+    "VerifyMs": 1.6917,
+    "VerifyChecksum": "B7578931045C8FC5",
+    "PeakProcessWorkingSetBytes": 807182336,
+    "Environment": "* OS: Ubuntu 24.04.3 LTS\n* Architecture: X64\n* .NET: 10.0.9\n* CPU: AMD EPYC 4345P 8-Core Processor\n* Logical processors: 16\n* Total available memory: 60.4 GB\n* Initial process working set: 115.4 MB",
+    "InterruptedPhase": null
+  },
+  {
+    "Engine": "MySQL",
+    "Durability": "InnoDB; benchmark Docker disables binlog, sets innodb_flush_log_at_trx_commit=2 and sync_binlog=0; native SQL indexes; single-row writes use autocommit.",
+    "StartedAtUtc": "2026-07-10T06:40:49.7386634Z",
+    "Workload": {
+      "Profiles": 1000000,
+      "ReadCount": 1000000,
+      "EmailReadCount": 1000000,
+      "QueryCount": 250000,
+      "UpdateCount": 1000000,
+      "PostReadCount": 1000000,
+      "PostEmailReadCount": 1000000,
+      "PostQueryCount": 250000,
+      "QueryLimit": 100,
+      "Seed": 570123434,
+      "TimeoutSeconds": 120000
+    },
+    "EngineSettings": {
+      "Host": "127.0.0.1",
+      "Port": "3306",
+      "Database": "profilebench",
+      "User": "root"
+    },
+    "Completed": true,
+    "Status": "Completed",
+    "Phases": [
+      {
+        "Name": "insert profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 31777.8248,
+        "OperationsPerSecond": 31468.484903976183,
+        "Checksum": "70EEB1E90366F6E5"
+      },
+      {
+        "Name": "read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 19397.4891,
+        "OperationsPerSecond": 51553.06415406105,
+        "Checksum": "0FB577C390019AC8"
+      },
+      {
+        "Name": "lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 22003.1195,
+        "OperationsPerSecond": 45448.10112038886,
+        "Checksum": "9C199CC596F7AC10"
+      },
+      {
+        "Name": "scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 13505.6669,
+        "OperationsPerSecond": 18510.74825486774,
+        "Checksum": "B3350AAEFBCE068F"
+      },
+      {
+        "Name": "query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 37178.507,
+        "OperationsPerSecond": 6724.315207170637,
+        "Checksum": "11A194A99CB7D634"
+      },
+      {
+        "Name": "scan created-at index",
+        "Operations": 250000,
+        "ElapsedMs": 11741.4228,
+        "OperationsPerSecond": 21292.138462129136,
+        "Checksum": "E3FE4E613ABE23A5"
+      },
+      {
+        "Name": "query created-at range",
+        "Operations": 250000,
+        "ElapsedMs": 36348.6743,
+        "OperationsPerSecond": 6877.8299295498655,
+        "Checksum": "B8595B9702849552"
+      },
+      {
+        "Name": "scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 9642.7534,
+        "OperationsPerSecond": 25926.20485348096,
+        "Checksum": "FD457DADD7424105"
+      },
+      {
+        "Name": "query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 34541.7226,
+        "OperationsPerSecond": 7237.623985782342,
+        "Checksum": "B472892F8C7EF235"
+      },
+      {
+        "Name": "update profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 62962.9892,
+        "OperationsPerSecond": 15882.346322909332,
+        "Checksum": "2440ADD57E65500B"
+      },
+      {
+        "Name": "post-update read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 19516.9788,
+        "OperationsPerSecond": 51237.4384502585,
+        "Checksum": "7DB9AA24CC9A8B8E"
+      },
+      {
+        "Name": "post-update lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 22199.0514,
+        "OperationsPerSecond": 45046.96988989359,
+        "Checksum": "43569B6DA38ACCB5"
+      },
+      {
+        "Name": "post-update scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 13390.6004,
+        "OperationsPerSecond": 18669.81259481091,
+        "Checksum": "896A595A5F979F99"
+      },
+      {
+        "Name": "post-update query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 36583.6118,
+        "OperationsPerSecond": 6833.660967285904,
+        "Checksum": "EF5D80897CBF7824"
+      },
+      {
+        "Name": "post-update scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 9700.7341,
+        "OperationsPerSecond": 25771.24549780207,
+        "Checksum": "905E8A81EE9017E5"
+      },
+      {
+        "Name": "post-update query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 32771.2048,
+        "OperationsPerSecond": 7628.6484285741,
+        "Checksum": "1A17E74A9E34D635"
+      }
+    ],
+    "RunElapsedMs": 413522.8118,
+    "PreReadStabilizeMs": null,
+    "PostUpdateStabilizeMs": null,
+    "SettleMs": 1.1168,
+    "StorageSizeBytes": 326828032,
+    "ReopenMs": 3.499,
+    "VerifyMs": 42.6981,
+    "VerifyChecksum": "B7578931045C8FC5",
+    "PeakProcessWorkingSetBytes": 174985216,
+    "Environment": "* OS: Ubuntu 24.04.3 LTS\n* Architecture: X64\n* .NET: 10.0.9\n* CPU: AMD EPYC 4345P 8-Core Processor\n* Logical processors: 16\n* Total available memory: 60.4 GB\n* Initial process working set: 115.5 MB",
+    "InterruptedPhase": null
+  }
+]
