@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using ProfileStore.Benchmark;
 
@@ -185,7 +186,11 @@ static async Task UpdateLatestAsync(IReadOnlyList<BenchmarkResult> results, Canc
     throw new InvalidOperationException("Benchmark results are empty.");
 
   var profileDirectory = $"profiles-{results[0].Workload.Profiles.ToString(CultureInfo.InvariantCulture)}";
-  var referenceDirectory = Path.Combine(FindBenchmarkDirectory(), "reference", profileDirectory);
+  var referenceDirectory = Path.Combine(
+      FindBenchmarkDirectory(),
+      "reference",
+      GetReferencePlatformDirectoryName(),
+      profileDirectory);
   Directory.CreateDirectory(referenceDirectory);
 
   foreach (var staleChart in Directory.GetFiles(referenceDirectory, "latest-*.svg"))
@@ -232,6 +237,17 @@ static string FindBenchmarkDirectory()
 
   throw new InvalidOperationException(
       "Could not locate benchmarks/profile-store. Run from the repository root or benchmarks/profile-store directory.");
+}
+
+static string GetReferencePlatformDirectoryName()
+{
+  if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+    return "win";
+  if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+    return "linux";
+  if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+    return "macos";
+  return "unknown";
 }
 
 static async Task<IReadOnlyList<BenchmarkResult>> RunChildProcessesAsync(

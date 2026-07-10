@@ -226,8 +226,8 @@ in `.runs/`.
 The Markdown report includes environment information, configuration, durability settings, SVG charts, phase timings, throughput, read-stabilization time, final settle/checkpoint time, reopen time, verify time, storage size, process peak memory, and checksum status.
 
 Generated reports under `results/` are local artifacts. Commit only curated
-reference results under `reference/profiles-<count>/`, after a clean run on a
-documented machine.
+reference results under `reference/<os>/profiles-<count>/`, after a clean run
+on a documented machine.
 
 To regenerate SVG charts for an existing JSON report without rerunning the
 benchmark:
@@ -249,5 +249,7 @@ To publish the current run as the committed latest reference:
 dotnet run --project src\ProfileStore.Benchmark.csproj -c Release -- --mysql-host 192.168.178.25 --mysql-port 3306 --mysql-user root --mysql-password "DevMySql_123456!" --mysql-database profilebench --output results --data data --update-latest --timeout-seconds 1200 --engine all --profiles 100K,500K,1M,2M,5M,10M
 ```
 
-This updates `reference/profiles-<count>/latest.md` and the matching
-`latest.json` and `latest-*.svg` files for each requested profile count.
+This updates `reference/<os>/profiles-<count>/latest.md` and the matching
+`latest.json` and `latest-*.svg` files for each requested profile count. The
+`<os>` directory is selected from the current operating system, such as `win`
+or `linux`.
