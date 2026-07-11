@@ -1,4 +1,4 @@
-# Benchmark 100K Profiles
+# Benchmark 100K Profiles - Linux
 
 ## Charts
 
@@ -47,8 +47,18 @@ Checksum validation passed across completed engines: ZoneTree, RocksDB, SQLite, 
 * MySQL is measured as a client/server database over TCP.
 * Embedded engines run in the benchmark process.
 * Completed phase time is the sum of measured workload phases. Run time also includes initialization, stabilization, settle/checkpoint, reopen, verification, and reporting overhead.
+* The write throughput chart includes raw write phases and derived write-readiness bars that add the following stabilization phase.
 * Storage is measured after each engine settles or checkpoints its data.
 * Process peak memory is measured for the benchmark process. For MySQL, this excludes MySQL server/container memory.
+
+## Write Readiness
+
+| Engine | Insert | Pre-read stabilize | Insert + stabilize | Insert ready throughput | Update | Post-update stabilize | Update + stabilize | Update ready throughput |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| ZoneTree | 528 ms | 194 ms | 722 ms | 138_571/s | 584 ms | 182 ms | 766 ms | 130_570/s |
+| RocksDB | 533 ms | 130 ms | 663 ms | 150_801/s | 976 ms | 214 ms | 1_190 ms | 84_032/s |
+| SQLite | 15_985 ms | n/a | 15_985 ms | 6_256/s | 12_664 ms | n/a | 12_664 ms | 7_897/s |
+| MySQL | 3_910 ms | n/a | 3_910 ms | 25_577/s | 5_411 ms | n/a | 5_411 ms | 18_482/s |
 
 ## Phase Results
 

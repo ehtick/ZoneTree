@@ -1,4 +1,4 @@
-# Benchmark 20M Profiles
+# Benchmark 20M Profiles - Windows
 
 ## Charts
 
@@ -43,8 +43,16 @@ Checksum validation passed across completed engines: ZoneTree, RocksDB.
 * ZoneTree and RocksDB secondary indexes are maintained by the benchmark application using separate stores.
 * Embedded engines run in the benchmark process.
 * Completed phase time is the sum of measured workload phases. Run time also includes initialization, stabilization, settle/checkpoint, reopen, verification, and reporting overhead.
+* The write throughput chart includes raw write phases and derived write-readiness bars that add the following stabilization phase.
 * Storage is measured after each engine settles or checkpoints its data.
 * Process peak memory is measured for the benchmark process.
+
+## Write Readiness
+
+| Engine | Insert | Pre-read stabilize | Insert + stabilize | Insert ready throughput | Update | Post-update stabilize | Update + stabilize | Update ready throughput |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| ZoneTree | 203_568 ms | 21_139 ms | 224_707 ms | 89_005/s | 644_479 ms | 45_882 ms | 690_361 ms | 28_970/s |
+| RocksDB | 221_874 ms | 17_037 ms | 238_911 ms | 83_713/s | 728_061 ms | 22_129 ms | 750_190 ms | 26_660/s |
 
 ## Phase Results
 
