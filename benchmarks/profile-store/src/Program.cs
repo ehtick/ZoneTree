@@ -17,6 +17,16 @@ try
     await RenderMarkdownAsync(renderMarkdownJsonReportPath, CancellationToken.None);
     return;
   }
+  if (args is ["--render-reference-reports"])
+  {
+    await RenderReferenceReportsAsync(referenceDirectory: null, CancellationToken.None);
+    return;
+  }
+  if (args is ["--render-reference-reports", var referenceDirectory])
+  {
+    await RenderReferenceReportsAsync(referenceDirectory, CancellationToken.None);
+    return;
+  }
 
   var config = BenchmarkConfig.Parse(args);
   ApplyCleanup(config);
@@ -94,6 +104,7 @@ static void PrintHelp()
         --mysql-password <password>
         --render-charts <profile-store-report.json>
         --render-markdown <profile-store-report.json>
+        --render-reference-reports [reference-directory]
         --update-latest
 
       Example:
@@ -157,6 +168,42 @@ static async Task RenderMarkdownAsync(string jsonReportPath, CancellationToken c
       .ToArray();
   await ResultWriter.WriteMarkdownAsync(report.Results, report.MarkdownPath, charts, ct);
   Console.WriteLine($"Wrote {report.MarkdownPath}");
+}
+
+static async Task RenderReferenceReportsAsync(string? referenceDirectory, CancellationToken ct)
+{
+  referenceDirectory ??= Path.Combine(FindBenchmarkDirectory(), "reference");
+  if (!Directory.Exists(referenceDirectory))
+    throw new DirectoryNotFoundException($"Reference directory was not found: {referenceDirectory}");
+
+  var jsonReportPaths = Directory
+      .EnumerateFiles(referenceDirectory, "latest.json", SearchOption.AllDirectories)
+      .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+      .ToArray();
+
+  if (jsonReportPaths.Length == 0)
+  {
+    Console.WriteLine($"No latest.json files found under {referenceDirectory}");
+    return;
+  }
+
+  foreach (var jsonReportPath in jsonReportPaths)
+  {
+    var report = await ReadReportAsync(jsonReportPath, ct);
+    foreach (var staleChart in Directory.GetFiles(report.Directory, "latest-*.svg"))
+      File.Delete(staleChart);
+
+    var charts = await BenchmarkChartWriter.WriteAsync(
+        report.Results,
+        report.Directory,
+        "latest",
+        "latest",
+        ct);
+    await ResultWriter.WriteMarkdownAsync(report.Results, report.MarkdownPath, charts, ct);
+    Console.WriteLine($"Wrote {report.MarkdownPath}");
+    foreach (var chart in charts)
+      Console.WriteLine($"Wrote {Path.Combine(report.Directory, chart.FileName)}");
+  }
 }
 
 static async Task<(string Directory, string FileName, string Stamp, string FilePrefix, string MarkdownPath, IReadOnlyList<BenchmarkResult> Results)> ReadReportAsync(

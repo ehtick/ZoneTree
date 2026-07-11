@@ -87,7 +87,7 @@ public static class ResultWriter
   {
     var first = results[0];
     var writer = new StringWriter();
-    writer.WriteLine($"# Benchmark {FormatProfileCount(first.Workload.Profiles)} Profiles");
+    writer.WriteLine($"# Benchmark {FormatProfileCount(first.Workload.Profiles)} Profiles{FormatTitleOsSuffix(results)}");
     writer.WriteLine();
     writer.WriteLine("## Charts");
     writer.WriteLine();
@@ -117,6 +117,7 @@ public static class ResultWriter
     foreach (var note in CreateInterpretationNotes(results))
       writer.WriteLine($"* {note}");
     writer.WriteLine();
+    WriteWriteReadiness(writer, results);
     writer.WriteLine("## Phase Results");
     writer.WriteLine();
     foreach (var result in results)
@@ -181,6 +182,54 @@ public static class ResultWriter
     return writer.ToString();
   }
 
+  static void WriteWriteReadiness(StringWriter writer, IReadOnlyList<BenchmarkResult> results)
+  {
+    var rows = results
+        .Select(CreateWriteReadinessRow)
+        .Where(row => row.Insert != null || row.Update != null)
+        .ToArray();
+    if (rows.Length == 0)
+      return;
+
+    writer.WriteLine("## Write Readiness");
+    writer.WriteLine();
+    writer.WriteLine("| Engine | Insert | Pre-read stabilize | Insert + stabilize | Insert ready throughput | Update | Post-update stabilize | Update + stabilize | Update ready throughput |");
+    writer.WriteLine("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+    foreach (var row in rows)
+    {
+      writer.WriteLine($"| {row.Engine} | {FormatMilliseconds(row.Insert?.ElapsedMs)} | {FormatMilliseconds(row.PreReadStabilizeMs)} | {FormatMilliseconds(row.InsertReadyMs)} | {FormatThroughput(row.InsertReadyThroughput)} | {FormatMilliseconds(row.Update?.ElapsedMs)} | {FormatMilliseconds(row.PostUpdateStabilizeMs)} | {FormatMilliseconds(row.UpdateReadyMs)} | {FormatThroughput(row.UpdateReadyThroughput)} |");
+    }
+    writer.WriteLine();
+  }
+
+  static WriteReadinessRow CreateWriteReadinessRow(BenchmarkResult result)
+  {
+    var insert = result.Phases.FirstOrDefault(x => x.Name == "insert profiles");
+    var update = result.Phases.FirstOrDefault(x => x.Name == "update profiles");
+    var insertReadyMs = AddStabilizeMs(insert, result.PreReadStabilizeMs);
+    var updateReadyMs = AddStabilizeMs(update, result.PostUpdateStabilizeMs);
+    return new WriteReadinessRow(
+        result.Engine,
+        insert,
+        result.PreReadStabilizeMs,
+        insertReadyMs,
+        CalculateThroughput(insert?.Operations, insertReadyMs),
+        update,
+        result.PostUpdateStabilizeMs,
+        updateReadyMs,
+        CalculateThroughput(update?.Operations, updateReadyMs));
+  }
+
+  static double? AddStabilizeMs(PhaseResult? phase, double? stabilizeMs) =>
+      phase == null ? null : phase.ElapsedMs + (stabilizeMs ?? 0);
+
+  static double? CalculateThroughput(long? operations, double? elapsedMs)
+  {
+    if (!operations.HasValue || !elapsedMs.HasValue || elapsedMs.Value <= 0)
+      return null;
+    return operations.Value / (elapsedMs.Value / 1000);
+  }
+
   static IReadOnlyList<string> CreateInterpretationNotes(IReadOnlyList<BenchmarkResult> results)
   {
     var engines = results.Select(x => x.Engine).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -219,6 +268,8 @@ public static class ResultWriter
 
     notes.Add(
         "Completed phase time is the sum of measured workload phases. Run time also includes initialization, stabilization, settle/checkpoint, reopen, verification, and reporting overhead.");
+    notes.Add(
+        "The write throughput chart includes raw write phases and derived write-readiness bars that add the following stabilization phase.");
     notes.Add("Storage is measured after each engine settles or checkpoints its data.");
 
     if (engines.Contains("MySQL"))
@@ -259,6 +310,9 @@ public static class ResultWriter
   static string FormatMilliseconds(double? milliseconds) =>
       milliseconds.HasValue ? $"{FormatInteger(milliseconds.Value)} ms" : "n/a";
 
+  static string FormatThroughput(double? operationsPerSecond) =>
+      operationsPerSecond.HasValue ? $"{FormatInteger(operationsPerSecond.Value)}/s" : "n/a";
+
   static string FormatInteger(double value) =>
       FormatInteger((long)Math.Round(value, MidpointRounding.AwayFromZero));
 
@@ -272,6 +326,37 @@ public static class ResultWriter
     if (value >= 1_000 && value % 1_000 == 0)
       return $"{value / 1_000}K";
     return FormatInteger(value);
+  }
+
+  static string FormatTitleOsSuffix(IReadOnlyList<BenchmarkResult> results)
+  {
+    var suffix = GetTitleOsName(results[0].Environment);
+    return suffix == null ? "" : $" - {suffix}";
+  }
+
+  static string? GetTitleOsName(string environment)
+  {
+    var osLine = environment
+        .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+        .FirstOrDefault(line => line.StartsWith("* OS:", StringComparison.OrdinalIgnoreCase));
+    if (osLine == null)
+      return null;
+
+    var os = osLine["* OS:".Length..].Trim();
+    if (os.Contains("Windows", StringComparison.OrdinalIgnoreCase))
+      return "Windows";
+    if (os.Contains("Ubuntu", StringComparison.OrdinalIgnoreCase)
+        || os.Contains("Linux", StringComparison.OrdinalIgnoreCase)
+        || os.Contains("Debian", StringComparison.OrdinalIgnoreCase)
+        || os.Contains("Fedora", StringComparison.OrdinalIgnoreCase)
+        || os.Contains("Red Hat", StringComparison.OrdinalIgnoreCase)
+        || os.Contains("CentOS", StringComparison.OrdinalIgnoreCase))
+      return "Linux";
+    if (os.Contains("macOS", StringComparison.OrdinalIgnoreCase)
+        || os.Contains("OSX", StringComparison.OrdinalIgnoreCase)
+        || os.Contains("Darwin", StringComparison.OrdinalIgnoreCase))
+      return "macOS";
+    return null;
   }
 
   static string FormatChecksum(string? checksum) =>
@@ -306,6 +391,17 @@ public static class ResultWriter
       return result.Status ?? "Incomplete";
     return $"{result.Status ?? "Incomplete"}; interrupted: {result.InterruptedPhase}";
   }
+
+  sealed record WriteReadinessRow(
+      string Engine,
+      PhaseResult? Insert,
+      double? PreReadStabilizeMs,
+      double? InsertReadyMs,
+      double? InsertReadyThroughput,
+      PhaseResult? Update,
+      double? PostUpdateStabilizeMs,
+      double? UpdateReadyMs,
+      double? UpdateReadyThroughput);
 }
 
 public static class Timing

@@ -8,6 +8,18 @@ The commands below assume:
 * the server user can install packages,
 * the repository will be cloned under `/home/ubuntu/ZoneTree`.
 
+## Set CPU Performance Governor
+
+```bash
+apt-get install -y linux-tools-generic
+
+cpupower frequency-info
+
+cpupower frequency-set -g performance
+```
+
+This setting is not persisted after reboot.
+
 ## Install .NET SDK
 
 ```bash
