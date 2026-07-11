@@ -47,6 +47,9 @@ are supported, for example `--profiles 10000,100K,500K,1M,2M,10M`.
 
 ## Run Locally
 
+For a Linux host setup without Docker, see
+[bare-metal-server-setup.md](bare-metal-server-setup.md).
+
 Start MySQL separately if you want to include it. A ready-to-paste Docker setup
 is available in [mysql-benchmark-tuning.md](mysql-benchmark-tuning.md). Then run:
 
@@ -162,6 +165,31 @@ dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- \
   --profiles 10000
 ```
 
+## Optional .NET GC Memory Tuning
+
+.NET GC behavior can be adjusted with environment variables. These settings are
+optional and should be reported with the benchmark result when used, because
+they can change both memory usage and throughput.
+
+```bash
+DOTNET_GCConserveMemory=1
+DOTNET_GCHighMemPercent=0x50
+```
+
+`DOTNET_GCConserveMemory` accepts values from `0` to `9`.
+`0` is the default and means no extra memory conservation. Higher values make
+the GC try harder to keep the managed heap smaller, usually by doing more GC
+work. This can reduce reported process peak memory, but may slow the benchmark.
+
+`DOTNET_GCHighMemPercent` sets the physical-memory usage percentage where the
+GC starts treating the machine as under high memory load. Environment variable
+values are hexadecimal, so `0x50` means `80%`, `0x5A` means `90%`, and `0x4B`
+means `75%`. Lower values make the GC react earlier.
+
+These are runtime-level controls, not the first ZoneTree tuning knobs. For
+application memory tuning, prefer ZoneTree storage and cache options first, such
+as sparse-array step size, block cache behavior, block size, and cache sizes.
+
 ## Data Model
 
 Each engine stores:
@@ -225,9 +253,20 @@ in `.runs/`.
 
 The Markdown report includes environment information, configuration, durability settings, SVG charts, phase timings, throughput, read-stabilization time, final settle/checkpoint time, reopen time, verify time, storage size, process peak memory, and checksum status.
 
+The write throughput chart shows both raw write phases and derived stabilized
+write-readiness bars:
+
+* `insert` uses only the measured insert phase.
+* `insert + stabilize` adds the following pre-read stabilization time.
+* `update` uses only the measured update phase.
+* `update + stabilize` adds the following post-update stabilization time.
+
+This keeps raw write throughput visible while also showing when the engine is
+settled for the next read/query phase.
+
 Generated reports under `results/` are local artifacts. Commit only curated
-reference results under `reference/profiles-<count>/`, after a clean run on a
-documented machine.
+reference results under `reference/<os>/profiles-<count>/`, after a clean run
+on a documented machine.
 
 To regenerate SVG charts for an existing JSON report without rerunning the
 benchmark:
@@ -243,11 +282,34 @@ rewriting the JSON or SVG files:
 dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --render-markdown results/profiles-10000/profile-store-YYYYMMDD-HHMMSS.json
 ```
 
+To regenerate every committed reference report from existing `latest.json`
+files without rerunning benchmarks:
+
+```bash
+dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --render-reference-reports
+```
+
+You can also pass a specific reference directory:
+
+```bash
+dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --render-reference-reports reference/linux
+```
+
 To publish the current run as the committed latest reference:
 
 ```bash
-dotnet run --project src\ProfileStore.Benchmark.csproj -c Release -- --mysql-host 192.168.178.25 --mysql-port 3306 --mysql-user root --mysql-password "DevMySql_123456!" --mysql-database profilebench --output results --data data --update-latest --timeout-seconds 1200 --engine all --profiles 100K,500K,1M,2M,5M,10M
+#windows
+dotnet run --project src\ProfileStore.Benchmark.csproj -c Release -- --mysql-host 192.168.178.25 --mysql-port 3306 --mysql-user root --mysql-password "DevMySql_123456!" --mysql-database profilebench --output results --data data --update-latest --timeout-seconds 120000 --engine all --profiles 100K,500K,1M,2M,5M,10M
+
+#linux
+nohup dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --mysql-host 127.0.0.1 --mysql-port 3306 --mysql-user root --mysql-password "DevMySql_123456!" --mysql-database profilebench --output results --data data --update-latest --timeout-seconds 120000 --engine all --profiles 100K,500K,1M,2M
+
+nohup dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --mysql-host 127.0.0.1 --mysql-port 3306 --mysql-user root --mysql-password "DevMySql_123456!" --mysql-database profilebench --output results --data data --update-latest --timeout-seconds 120000 --engine all --profiles 5M,10M,50M
+
+nohup dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --mysql-host 127.0.0.1 --mysql-port 3306 --mysql-user root --mysql-password "DevMySql_123456!" --mysql-database profilebench --output results --data data --update-latest --timeout-seconds 120000 --engine all --profiles 100M --zonetree-sparse-array-step-size 32
 ```
 
-This updates `reference/profiles-<count>/latest.md` and the matching
-`latest.json` and `latest-*.svg` files for each requested profile count.
+This updates `reference/<os>/profiles-<count>/latest.md` and the matching
+`latest.json` and `latest-*.svg` files for each requested profile count. The
+`<os>` directory is selected from the current operating system, such as `win`
+or `linux`.

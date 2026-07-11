@@ -1,4 +1,4 @@
-using System.Globalization;
+using System.Buffers.Binary;
 using System.Text;
 using RocksDbSharp;
 
@@ -50,7 +50,7 @@ public sealed class RocksDbProfileStore : IProfileStoreEngine
     {
       ct.ThrowIfCancellationRequested();
       var userId = UserIdValue(profile.UserId);
-      Profiles!.Put(Bytes(UserIdKey(profile.UserId)), Bytes(ProfileCodec.Serialize(profile)), null, WriteOpts);
+      Profiles!.Put(UserIdKey(profile.UserId), Bytes(ProfileCodec.Serialize(profile)), null, WriteOpts);
       EmailIndex!.Put(Bytes(profile.Email), userId, null, WriteOpts);
       CountryStatusIndex!.Put(Bytes(ProfileKeys.CountryStatus(profile)), userId, null, WriteOpts);
       CreatedAtIndex!.Put(Bytes(ProfileKeys.CreatedAt(profile)), userId, null, WriteOpts);
@@ -61,13 +61,13 @@ public sealed class RocksDbProfileStore : IProfileStoreEngine
 
   public Task<UserProfile?> GetByUserIdAsync(long userId, CancellationToken ct)
   {
-    var value = Profiles!.Get(UserIdKey(userId), null);
-    return Task.FromResult(value == null ? null : ProfileCodec.Deserialize(value));
+    var value = Profiles!.Get(UserIdKey(userId), null, null);
+    return Task.FromResult(value == null ? null : ProfileCodec.Deserialize(Encoding.GetString(value)));
   }
 
   public Task<UserProfile?> GetByEmailAsync(string email, CancellationToken ct)
   {
-    var value = EmailIndex!.Get(email, null);
+    var value = EmailIndex!.Get(Bytes(email), null, null);
     if (value == null)
       return Task.FromResult<UserProfile?>(null);
     return GetByUserIdAsync(ParseUserId(value), ct);
@@ -135,7 +135,7 @@ public sealed class RocksDbProfileStore : IProfileStoreEngine
 
       CountryStatusIndex!.Remove(Bytes(ProfileKeys.CountryStatus(old)), null, WriteOpts);
       ReputationIndex!.Remove(Bytes(ProfileKeys.Reputation(old)), null, WriteOpts);
-      Profiles!.Put(Bytes(UserIdKey(profile.UserId)), Bytes(ProfileCodec.Serialize(profile)), null, WriteOpts);
+      Profiles!.Put(UserIdKey(profile.UserId), Bytes(ProfileCodec.Serialize(profile)), null, WriteOpts);
       CountryStatusIndex.Put(Bytes(ProfileKeys.CountryStatus(profile)), UserIdValue(profile.UserId), null, WriteOpts);
       ReputationIndex.Put(Bytes(ProfileKeys.Reputation(profile)), UserIdValue(profile.UserId), null, WriteOpts);
     }
@@ -196,10 +196,10 @@ public sealed class RocksDbProfileStore : IProfileStoreEngine
 
   bool TryGetProfile(long userId, out UserProfile profile)
   {
-    var value = Profiles!.Get(UserIdKey(userId), null);
+    var value = Profiles!.Get(UserIdKey(userId), null, null);
     if (value != null)
     {
-      profile = ProfileCodec.Deserialize(value);
+      profile = ProfileCodec.Deserialize(Encoding.GetString(value));
       return true;
     }
     profile = null!;
@@ -226,7 +226,7 @@ public sealed class RocksDbProfileStore : IProfileStoreEngine
       var key = iterator.StringKey();
       if (!keepGoing(key))
         break;
-      if (TryGetProfile(ParseUserId(iterator.StringValue()), out var profile))
+      if (TryGetProfile(ParseUserId(iterator.Value()), out var profile))
         results.Add(profile);
       iterator.Next();
     }
@@ -253,20 +253,31 @@ public sealed class RocksDbProfileStore : IProfileStoreEngine
       var key = iterator.StringKey();
       if (!keepGoing(key))
         break;
-      results.Add(ParseUserId(iterator.StringValue()));
+      results.Add(ParseUserId(iterator.Value()));
       iterator.Next();
     }
     return results;
   }
 
-  static string UserIdKey(long userId) =>
-      userId.ToString("D20", CultureInfo.InvariantCulture);
+  static byte[] UserIdKey(long userId) =>
+      UserIdValue(userId);
 
   static byte[] UserIdValue(long userId) =>
-      Bytes(UserIdKey(userId));
+      WriteSortableInt64(userId);
 
-  static long ParseUserId(string value) =>
-      long.Parse(value, CultureInfo.InvariantCulture);
+  static long ParseUserId(byte[] value)
+  {
+    if (value.Length != sizeof(long))
+      throw new FormatException($"Expected an 8-byte Int64 value, but received {value.Length} bytes.");
+    return BinaryPrimitives.ReadInt64BigEndian(value);
+  }
+
+  static byte[] WriteSortableInt64(long value)
+  {
+    var bytes = new byte[sizeof(long)];
+    BinaryPrimitives.WriteInt64BigEndian(bytes, value);
+    return bytes;
+  }
 
   static byte[] Bytes(string value) =>
       Encoding.GetBytes(value);

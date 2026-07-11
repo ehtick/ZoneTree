@@ -113,11 +113,7 @@ public static class BenchmarkChartWriter
     var charts = new (ChartArtifact Artifact, string Svg)[]
     {
       (artifacts[0], CreateExecutionTime(results)),
-      (artifacts[1], CreatePhaseThroughput(
-          results,
-          "Write Throughput",
-          "Grouped bars show relative throughput for insert and update phases; tallest bar per phase is 100%",
-          ["insert profiles", "update profiles"])),
+      (artifacts[1], CreateWriteThroughput(results)),
       (artifacts[2], CreatePhaseThroughput(
           results,
           "Lookup Throughput",
@@ -197,13 +193,76 @@ public static class BenchmarkChartWriter
     return chart.Build();
   }
 
+  static string CreateWriteThroughput(IReadOnlyList<BenchmarkResult> results)
+  {
+    return CreateDataPointThroughput(
+        results.Select(result =>
+        {
+          var points = new List<ThroughputDataPoint>();
+          AddWritePhase(
+              points,
+              result,
+              "insert profiles",
+              "insert",
+              "insert + stabilize",
+              result.PreReadStabilizeMs);
+          AddWritePhase(
+              points,
+              result,
+              "update profiles",
+              "update",
+              "update + stabilize",
+              result.PostUpdateStabilizeMs);
+          return (result.Engine, Points: (IReadOnlyList<ThroughputDataPoint>)points);
+        }).ToArray(),
+        "Write Throughput",
+        "Raw write throughput and throughput after the following stabilization phase; tallest bar per group is 100%",
+        ["insert", "insert + stabilize", "update", "update + stabilize"]);
+  }
+
+  static void AddWritePhase(
+      List<ThroughputDataPoint> points,
+      BenchmarkResult result,
+      string phaseName,
+      string rawLabel,
+      string stabilizedLabel,
+      double? stabilizeMs)
+  {
+    var phase = result.Phases.FirstOrDefault(p => p.Name == phaseName);
+    if (phase == null)
+      return;
+
+    points.Add(new ThroughputDataPoint(rawLabel, phase.OperationsPerSecond));
+    var readyMs = phase.ElapsedMs + (stabilizeMs ?? 0);
+    if (readyMs > 0)
+      points.Add(new ThroughputDataPoint(stabilizedLabel, phase.Operations / (readyMs / 1000)));
+  }
+
   static string CreatePhaseThroughput(
       IReadOnlyList<BenchmarkResult> results,
       string title,
       string subtitle,
       IReadOnlyList<string> phaseNames)
   {
-    var available = results.SelectMany(r => r.Phases.Select(p => p.Name)).ToHashSet(StringComparer.Ordinal);
+    return CreateDataPointThroughput(
+        results.Select(result => (
+            result.Engine,
+            Points: (IReadOnlyList<ThroughputDataPoint>)result.Phases
+                .Select(phase => new ThroughputDataPoint(phase.Name, phase.OperationsPerSecond))
+                .ToArray()))
+        .ToArray(),
+        title,
+        subtitle,
+        phaseNames);
+  }
+
+  static string CreateDataPointThroughput(
+      IReadOnlyList<(string Engine, IReadOnlyList<ThroughputDataPoint> Points)> results,
+      string title,
+      string subtitle,
+      IReadOnlyList<string> phaseNames)
+  {
+    var available = results.SelectMany(r => r.Points.Select(p => p.Name)).ToHashSet(StringComparer.Ordinal);
     var phases = phaseNames.Where(available.Contains).ToArray();
     var engines = results.Select(r => r.Engine).ToArray();
     const double left = SvgChartBuilder.MarginLeft;
@@ -241,7 +300,7 @@ public static class BenchmarkChartWriter
           .Select(result => new
           {
             result.Engine,
-            Phase = result.Phases.FirstOrDefault(p => p.Name == phase)
+            Phase = result.Points.FirstOrDefault(p => p.Name == phase)
           })
           .ToArray();
       var max = Math.Max(1, row.Max(x => x.Phase?.OperationsPerSecond ?? 0));
@@ -324,6 +383,10 @@ public static class BenchmarkChartWriter
   static string ShortPhaseName(string phase) =>
       phase switch
       {
+        "insert" => "insert",
+        "insert + stabilize" => "insert + stabilize",
+        "update" => "update",
+        "update + stabilize" => "update + stabilize",
         "read by user id" => "read user id",
         "lookup by email" => "email lookup",
         "scan country/status index" => "country/status",
@@ -349,4 +412,6 @@ public static class BenchmarkChartWriter
 
   static string FormatCount(long value) =>
       value.ToString("N0", CultureInfo.InvariantCulture).Replace(",", "_");
+
+  sealed record ThroughputDataPoint(string Name, double OperationsPerSecond);
 }

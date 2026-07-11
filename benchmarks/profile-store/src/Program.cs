@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using ProfileStore.Benchmark;
 
@@ -14,6 +15,16 @@ try
   if (args is ["--render-markdown", var renderMarkdownJsonReportPath])
   {
     await RenderMarkdownAsync(renderMarkdownJsonReportPath, CancellationToken.None);
+    return;
+  }
+  if (args is ["--render-reference-reports"])
+  {
+    await RenderReferenceReportsAsync(referenceDirectory: null, CancellationToken.None);
+    return;
+  }
+  if (args is ["--render-reference-reports", var referenceDirectory])
+  {
+    await RenderReferenceReportsAsync(referenceDirectory, CancellationToken.None);
     return;
   }
 
@@ -93,6 +104,7 @@ static void PrintHelp()
         --mysql-password <password>
         --render-charts <profile-store-report.json>
         --render-markdown <profile-store-report.json>
+        --render-reference-reports [reference-directory]
         --update-latest
 
       Example:
@@ -158,6 +170,42 @@ static async Task RenderMarkdownAsync(string jsonReportPath, CancellationToken c
   Console.WriteLine($"Wrote {report.MarkdownPath}");
 }
 
+static async Task RenderReferenceReportsAsync(string? referenceDirectory, CancellationToken ct)
+{
+  referenceDirectory ??= Path.Combine(FindBenchmarkDirectory(), "reference");
+  if (!Directory.Exists(referenceDirectory))
+    throw new DirectoryNotFoundException($"Reference directory was not found: {referenceDirectory}");
+
+  var jsonReportPaths = Directory
+      .EnumerateFiles(referenceDirectory, "latest.json", SearchOption.AllDirectories)
+      .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+      .ToArray();
+
+  if (jsonReportPaths.Length == 0)
+  {
+    Console.WriteLine($"No latest.json files found under {referenceDirectory}");
+    return;
+  }
+
+  foreach (var jsonReportPath in jsonReportPaths)
+  {
+    var report = await ReadReportAsync(jsonReportPath, ct);
+    foreach (var staleChart in Directory.GetFiles(report.Directory, "latest-*.svg"))
+      File.Delete(staleChart);
+
+    var charts = await BenchmarkChartWriter.WriteAsync(
+        report.Results,
+        report.Directory,
+        "latest",
+        "latest",
+        ct);
+    await ResultWriter.WriteMarkdownAsync(report.Results, report.MarkdownPath, charts, ct);
+    Console.WriteLine($"Wrote {report.MarkdownPath}");
+    foreach (var chart in charts)
+      Console.WriteLine($"Wrote {Path.Combine(report.Directory, chart.FileName)}");
+  }
+}
+
 static async Task<(string Directory, string FileName, string Stamp, string FilePrefix, string MarkdownPath, IReadOnlyList<BenchmarkResult> Results)> ReadReportAsync(
     string jsonReportPath,
     CancellationToken ct)
@@ -185,7 +233,11 @@ static async Task UpdateLatestAsync(IReadOnlyList<BenchmarkResult> results, Canc
     throw new InvalidOperationException("Benchmark results are empty.");
 
   var profileDirectory = $"profiles-{results[0].Workload.Profiles.ToString(CultureInfo.InvariantCulture)}";
-  var referenceDirectory = Path.Combine(FindBenchmarkDirectory(), "reference", profileDirectory);
+  var referenceDirectory = Path.Combine(
+      FindBenchmarkDirectory(),
+      "reference",
+      GetReferencePlatformDirectoryName(),
+      profileDirectory);
   Directory.CreateDirectory(referenceDirectory);
 
   foreach (var staleChart in Directory.GetFiles(referenceDirectory, "latest-*.svg"))
@@ -232,6 +284,17 @@ static string FindBenchmarkDirectory()
 
   throw new InvalidOperationException(
       "Could not locate benchmarks/profile-store. Run from the repository root or benchmarks/profile-store directory.");
+}
+
+static string GetReferencePlatformDirectoryName()
+{
+  if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+    return "win";
+  if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+    return "linux";
+  if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+    return "macos";
+  return "unknown";
 }
 
 static async Task<IReadOnlyList<BenchmarkResult>> RunChildProcessesAsync(
