@@ -12,6 +12,10 @@ public sealed partial class BTree<TKey, TValue>
 {
   public bool ContainsKey(in TKey key)
   {
+    if (_length == 0)
+    {
+      return false;
+    }
     var topLevelLocker = TopLevelLocker;
     try
     {
@@ -60,6 +64,11 @@ public sealed partial class BTree<TKey, TValue>
 
   public bool TryGetValue(in TKey key, out TValue value)
   {
+    if (_length == 0)
+    {
+      value = default;
+      return false;
+    }
     var topLevelLocker = TopLevelLocker;
     try
     {
