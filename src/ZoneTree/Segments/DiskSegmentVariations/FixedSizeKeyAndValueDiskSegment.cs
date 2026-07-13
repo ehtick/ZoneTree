@@ -206,6 +206,24 @@ public sealed class FixedSizeKeyAndValueDiskSegment<TKey, TValue> : DiskSegment<
           itemSize * startIndex,
           itemSize * count,
           pin1);
+      MaterializedEntryCache<TKey, TValue> cache = null;
+
+      if (count > 1)
+      {
+        cache = MaterializedEntryCache<TKey, TValue>.GetOrCreate(
+            pin1?.Device,
+            MaterializedEntryCacheSize);
+        if (cache != null && cache.TryCopy(
+            startIndex,
+            count,
+            keys,
+            values,
+            destinationIndex))
+        {
+          blockPin?.SetDevice1(pin1.Device);
+          return count;
+        }
+      }
 
       for (var i = 0; i < count; ++i)
       {
@@ -217,6 +235,7 @@ public sealed class FixedSizeKeyAndValueDiskSegment<TKey, TValue> : DiskSegment<
             bytes.Slice(sourceOffset + KeySize, ValueSize));
       }
 
+      cache?.Add(startIndex, count, keys, values, destinationIndex);
       blockPin?.SetDevice1(pin1.Device);
       return count;
     }
@@ -236,7 +255,7 @@ public sealed class FixedSizeKeyAndValueDiskSegment<TKey, TValue> : DiskSegment<
 
   public override void ReleaseResources()
   {
-    DataDevice?.Dispose();
+    base.ReleaseResources();
   }
 
   public override int ReleaseReadBuffers(long ticks)

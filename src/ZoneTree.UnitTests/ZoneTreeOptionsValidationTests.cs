@@ -232,6 +232,10 @@ public sealed class ZoneTreeOptionsValidationTests
         "DiskSegmentOptions.ValueCacheSize");
 
     yield return Invalid(
+        options => options.DiskSegmentOptions.MaterializedEntryCacheSize = -1,
+        "DiskSegmentOptions.MaterializedEntryCacheSize");
+
+    yield return Invalid(
         options => options.DiskSegmentOptions.KeyCacheRecordLifeTimeInMillisecond = -1,
         "DiskSegmentOptions.KeyCacheRecordLifeTimeInMillisecond");
 

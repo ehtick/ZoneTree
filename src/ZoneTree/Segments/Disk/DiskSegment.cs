@@ -19,6 +19,8 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
 
   protected readonly ISerializer<TValue> ValueSerializer;
 
+  protected readonly int MaterializedEntryCacheSize;
+
   protected IRandomAccessDevice DataDevice;
 
   protected int KeySize;
@@ -67,6 +69,7 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     KeySerializer = options.KeySerializer;
     ValueSerializer = options.ValueSerializer;
     var diskOptions = options.DiskSegmentOptions;
+    MaterializedEntryCacheSize = diskOptions.MaterializedEntryCacheSize;
     CircularKeyCache = new CircularCache<TKey>(
         diskOptions.KeyCacheSize,
         diskOptions.KeyCacheRecordLifeTimeInMillisecond);
@@ -87,6 +90,7 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     KeySerializer = options.KeySerializer;
     ValueSerializer = options.ValueSerializer;
     var diskOptions = options.DiskSegmentOptions;
+    MaterializedEntryCacheSize = diskOptions.MaterializedEntryCacheSize;
     CircularKeyCache = new CircularCache<TKey>(
         diskOptions.KeyCacheSize,
         diskOptions.KeyCacheRecordLifeTimeInMillisecond);
@@ -170,14 +174,16 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     if (step < 1)
       return;
     var sparseArray = new List<SparseArrayEntry<TKey, TValue>>();
+    var keys = new TKey[1];
+    var values = new TValue[1];
     for (int i = 0; i < len; i += step)
     {
-      var sparseArrayEntry = CreateSparseArrayEntry(i);
+      var sparseArrayEntry = CreateSparseArrayEntry(i, keys, values);
       sparseArray.Add(sparseArrayEntry);
     }
     if (sparseArray[^1].Index != len - 1)
     {
-      var sparseArrayEntry = CreateSparseArrayEntry(len - 1);
+      var sparseArrayEntry = CreateSparseArrayEntry(len - 1, keys, values);
       sparseArray.Add(sparseArrayEntry);
     }
     SparseArray = sparseArray;
@@ -188,13 +194,15 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     InitSparseArray((int)Math.Min(Length, int.MaxValue));
   }
 
-  SparseArrayEntry<TKey, TValue> CreateSparseArrayEntry(long index)
+  SparseArrayEntry<TKey, TValue> CreateSparseArrayEntry(
+      long index,
+      TKey[] keys,
+      TValue[] values)
   {
-    // Optimisation possibility? read key and value together to reduce IO calls.
-    var key = ReadKey(index);
-    var value = ReadValue(index);
-    var sparseArrayEntry = new SparseArrayEntry<TKey, TValue>(key, value, index);
-    return sparseArrayEntry;
+    if (ReadEntries(index, 1, keys, values, 0, null) != 1)
+      throw new InvalidOperationException(
+          $"Could not read sparse-array entry at index {index}.");
+    return new SparseArrayEntry<TKey, TValue>(keys[0], values[0], index);
   }
 
   protected TKey ReadKey(long index) => ReadKey(index, null);

@@ -244,6 +244,24 @@ public sealed partial class VariableSizeDiskSegment<TKey, TValue> : DiskSegment<
           startIndex * headSize,
           count * headSize,
           pin1);
+      MaterializedEntryCache<TKey, TValue> cache = null;
+
+      if (count > 1)
+      {
+        cache = MaterializedEntryCache<TKey, TValue>.GetOrCreate(
+            pin1?.Device,
+            MaterializedEntryCacheSize);
+        if (cache != null && cache.TryCopy(
+            startIndex,
+            count,
+            keys,
+            values,
+            destinationIndex))
+        {
+          blockPin?.SetDevice1(pin1.Device);
+          return count;
+        }
+      }
 
       for (var i = 0; i < count; ++i)
       {
@@ -276,6 +294,7 @@ public sealed partial class VariableSizeDiskSegment<TKey, TValue> : DiskSegment<
                 pin2));
       }
 
+      cache?.Add(startIndex, count, keys, values, destinationIndex);
       blockPin?.SetDevice1(pin1.Device);
       blockPin?.SetDevice2(pin2.Device);
       return count;
@@ -298,7 +317,7 @@ public sealed partial class VariableSizeDiskSegment<TKey, TValue> : DiskSegment<
   public override void ReleaseResources()
   {
     DataHeaderDevice?.Dispose();
-    DataDevice?.Dispose();
+    base.ReleaseResources();
   }
 
   public override int ReleaseReadBuffers(long ticks)

@@ -207,6 +207,12 @@ internal static class ZoneTreeOptionsValidator
     if (exception != null)
       return exception;
 
+    exception = ZoneTreeOptionValidationRules.DiskSegmentMaterializedEntryCacheSize.Validate(
+        Option(owner, nameof(options.MaterializedEntryCacheSize)),
+        options.MaterializedEntryCacheSize);
+    if (exception != null)
+      return exception;
+
     exception = ZoneTreeOptionValidationRules.DiskSegmentKeyCacheRecordLifeTimeInMillisecond.Validate(
         Option(owner, nameof(options.KeyCacheRecordLifeTimeInMillisecond)),
         options.KeyCacheRecordLifeTimeInMillisecond);
