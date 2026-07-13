@@ -383,6 +383,7 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
       DiskSegmentMode = dsk.DiskSegmentMode,
       KeyCacheRecordLifeTimeInMillisecond = dsk.KeyCacheRecordLifeTimeInMillisecond,
       KeyCacheSize = dsk.KeyCacheSize,
+      MaterializedEntryCacheSize = dsk.MaterializedEntryCacheSize,
       MaximumRecordCount = dsk.MaximumRecordCount,
       MinimumRecordCount = dsk.MinimumRecordCount,
       ValueCacheRecordLifeTimeInMillisecond = dsk.ValueCacheRecordLifeTimeInMillisecond,

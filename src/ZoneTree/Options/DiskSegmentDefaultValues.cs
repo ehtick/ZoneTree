@@ -18,6 +18,8 @@ public static class DiskSegmentDefaultValues
 
   public static readonly int ValueCacheSize = 1024;
 
+  public static readonly int MaterializedEntryCacheSize = 4096;
+
   public static readonly int KeyCacheRecordLifeTimeInMillisecond = 10_000;
 
   public static readonly int ValueCacheRecordLifeTimeInMillisecond = 10_000;

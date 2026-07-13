@@ -19,6 +19,8 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
 
   protected readonly ISerializer<TValue> ValueSerializer;
 
+  protected readonly int MaterializedEntryCacheSize;
+
   protected IRandomAccessDevice DataDevice;
 
   protected int KeySize;
@@ -67,6 +69,7 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     KeySerializer = options.KeySerializer;
     ValueSerializer = options.ValueSerializer;
     var diskOptions = options.DiskSegmentOptions;
+    MaterializedEntryCacheSize = diskOptions.MaterializedEntryCacheSize;
     CircularKeyCache = new CircularCache<TKey>(
         diskOptions.KeyCacheSize,
         diskOptions.KeyCacheRecordLifeTimeInMillisecond);
@@ -87,6 +90,7 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     KeySerializer = options.KeySerializer;
     ValueSerializer = options.ValueSerializer;
     var diskOptions = options.DiskSegmentOptions;
+    MaterializedEntryCacheSize = diskOptions.MaterializedEntryCacheSize;
     CircularKeyCache = new CircularCache<TKey>(
         diskOptions.KeyCacheSize,
         diskOptions.KeyCacheRecordLifeTimeInMillisecond);

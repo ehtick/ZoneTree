@@ -78,6 +78,18 @@ public sealed class DiskSegmentOptions
   public int ValueCacheSize { get; set; } = DiskSegmentDefaultValues.ValueCacheSize;
 
   /// <summary>
+  /// Gets or sets the maximum number of materialized 16-entry chunks cached
+  /// per decompressed disk block. Chunks are aligned by absolute disk index,
+  /// allowing iterators with different
+  /// <see cref="IteratorOptions.DiskSegmentPrefetchSize"/> values to reuse the
+  /// same entries without retaining overlapping batches. The default value of
+  /// 4096 chunks retains at most 65,536 materialized entries per decompressed
+  /// block. Setting this value to zero disables the cache.
+  /// </summary>
+  public int MaterializedEntryCacheSize { get; set; }
+      = DiskSegmentDefaultValues.MaterializedEntryCacheSize;
+
+  /// <summary>
   /// Gets or sets the maximum lifetime of a record in the key cache, in milliseconds.
   /// Longer lifetimes can keep cached keys in memory for longer.
   /// Default value is 10,000 milliseconds (10 seconds).

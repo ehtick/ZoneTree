@@ -34,6 +34,8 @@ public sealed class DecompressedBlock
     set => Volatile.Write(ref _lastAccessTicks, value);
   }
 
+  public object MaterializedEntries;
+
   public DecompressedBlock(
       int blockIndex,
       int blockSize,
