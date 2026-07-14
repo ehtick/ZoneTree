@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using ZoneTree.Collections;
 using ZoneTree.Comparers;
+using ZoneTree.Hashers;
 using ZoneTree.Logger;
 using ZoneTree.Options;
 using ZoneTree.Segments;
@@ -317,7 +318,8 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
       while (iterator.Next())
       {
         var key = iterator.CurrentKey;
-        var hasKey = diskSegment.ContainsKey(key);
+        var keyHashProvider = new KeyHashProvider<TKey>();
+        var hasKey = diskSegment.ContainsKey(key, ref keyHashProvider);
         var isDeleted = IsDeleted(key, iterator.CurrentValue);
         if (hasKey)
         {

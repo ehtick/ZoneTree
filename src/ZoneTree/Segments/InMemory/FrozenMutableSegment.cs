@@ -1,6 +1,7 @@
 using ZoneTree.Collections;
 using ZoneTree.Collections.BTree;
 using ZoneTree.Core;
+using ZoneTree.Hashers;
 
 namespace ZoneTree.Segments.InMemory;
 
@@ -25,9 +26,9 @@ public sealed class FrozenMutableSegment<TKey, TValue> : IMutableSegment<TKey, T
 
   public bool IsFullyFrozen => false;
 
-  public bool ContainsKey(in TKey key)
+  public bool ContainsKey(in TKey key, ref KeyHashProvider<TKey> keyHashProvider)
   {
-    return mutableSegment.ContainsKey(key);
+    return mutableSegment.ContainsKey(key, ref keyHashProvider);
   }
 
   public AddOrUpdateResult Delete(in TKey key, out long opIndex)
@@ -60,9 +61,9 @@ public sealed class FrozenMutableSegment<TKey, TValue> : IMutableSegment<TKey, T
     mutableSegment.ReleaseResources();
   }
 
-  public bool TryGet(in TKey key, out TValue value)
+  public bool TryGet(in TKey key, out TValue value, ref KeyHashProvider<TKey> keyHashProvider)
   {
-    return mutableSegment.TryGet(key, out value);
+    return mutableSegment.TryGet(key, out value, ref keyHashProvider);
   }
 
   public AddOrUpdateResult Upsert(in TKey key, in TValue value, out long opIndex)

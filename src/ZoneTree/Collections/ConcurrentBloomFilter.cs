@@ -1,12 +1,11 @@
 using System.Runtime.CompilerServices;
-using ZoneTree.Hashers;
 
 namespace ZoneTree.Collections;
 
 /// <summary>
 /// A fixed-size Bloom filter supporting concurrent readers and writers.
 /// </summary>
-public sealed class ConcurrentBloomFilter<TKey>
+public sealed class ConcurrentBloomFilter
 {
   const long MaximumBitCount = 1L << 30;
 
@@ -14,14 +13,10 @@ public sealed class ConcurrentBloomFilter<TKey>
 
   readonly ulong WordMask;
 
-  readonly IKeyHasher<TKey> KeyHasher;
-
   public ConcurrentBloomFilter(
       int expectedItemCount,
-      int bitsPerItem,
-      IKeyHasher<TKey> keyHasher)
+      int bitsPerItem)
   {
-    KeyHasher = keyHasher;
     var requestedBitCount = Math.Max(
         64L,
         (long)expectedItemCount * bitsPerItem);
@@ -34,23 +29,23 @@ public sealed class ConcurrentBloomFilter<TKey>
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  public void Add(in TKey key)
+  public void Add(int hashCode)
   {
-    GetWordAndBitMask(in key, out var wordIndex, out var bitMask);
+    GetWordAndBitMask(hashCode, out var wordIndex, out var bitMask);
     Interlocked.Or(ref Words[wordIndex], bitMask);
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  public bool MightContain(in TKey key)
+  public bool MightContain(int hashCode)
   {
-    GetWordAndBitMask(in key, out var wordIndex, out var bitMask);
+    GetWordAndBitMask(hashCode, out var wordIndex, out var bitMask);
     return (Volatile.Read(ref Words[wordIndex]) & bitMask) == bitMask;
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  void GetWordAndBitMask(in TKey key, out int wordIndex, out long bitMask)
+  void GetWordAndBitMask(int hashCode, out int wordIndex, out long bitMask)
   {
-    var hash = Mix(unchecked((uint)KeyHasher.GetHashCode(in key)));
+    var hash = Mix(unchecked((uint)hashCode));
     var firstBit = (int)(hash & 63);
     var bitStep = (int)((hash >> 6) & 31) * 2 + 1;
     var secondBit = (firstBit + bitStep) & 63;

@@ -1,6 +1,7 @@
 using ZoneTree.Collections;
 using ZoneTree.Comparers;
 using ZoneTree.Core;
+using ZoneTree.Hashers;
 using ZoneTree.Options;
 using ZoneTree.Segments.Block;
 using ZoneTree.WAL;
@@ -49,7 +50,7 @@ public sealed class ReadOnlySegment<TKey, TValue> : IReadOnlySegment<TKey, TValu
         ZoneTree<TKey, TValue>.SegmentWalCategory);
   }
 
-  public bool TryGet(in TKey key, out TValue value)
+  public bool TryGet(in TKey key, out TValue value, ref KeyHashProvider<TKey> keyHashProvider)
   {
     int index = BinarySearchAlgorithms
         .BinarySearch(SortedKeys, 0, SortedKeys.Count - 1, Comparer, in key);
@@ -62,7 +63,7 @@ public sealed class ReadOnlySegment<TKey, TValue> : IReadOnlySegment<TKey, TValu
     return true;
   }
 
-  public bool ContainsKey(in TKey key)
+  public bool ContainsKey(in TKey key, ref KeyHashProvider<TKey> keyHashProvider)
   {
     int index = BinarySearchAlgorithms
         .BinarySearch(SortedKeys, 0, SortedKeys.Count - 1, Comparer, in key);

@@ -1,4 +1,5 @@
 using ZoneTree.Collections;
+using ZoneTree.Hashers;
 using ZoneTree.Segments.Block;
 using ZoneTree.Segments.Disk;
 
@@ -18,7 +19,7 @@ public sealed class NullDiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
 
   public int ReadBufferCount => 0;
 
-  public bool ContainsKey(in TKey key)
+  public bool ContainsKey(in TKey key, ref KeyHashProvider<TKey> keyHashProvider)
   {
     return false;
   }
@@ -43,7 +44,7 @@ public sealed class NullDiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     // Nothing to load
   }
 
-  public bool TryGet(in TKey key, out TValue value)
+  public bool TryGet(in TKey key, out TValue value, ref KeyHashProvider<TKey> keyHashProvider)
   {
     value = default;
     return false;

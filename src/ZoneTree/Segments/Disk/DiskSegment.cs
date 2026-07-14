@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using ZoneTree.Collections;
 using ZoneTree.Comparers;
 using ZoneTree.Exceptions;
+using ZoneTree.Hashers;
 using ZoneTree.Options;
 using ZoneTree.Segments.Block;
 using ZoneTree.Segments.RandomAccess;
@@ -168,7 +169,7 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
         diskOptions.ValueCacheRecordLifeTimeInMillisecond);
   }
 
-  public bool ContainsKey(in TKey key)
+  public bool ContainsKey(in TKey key, ref KeyHashProvider<TKey> keyHashProvider)
   {
     var sparseArrayLength = SparseArray.Count;
     long lower = 0;
@@ -198,7 +199,7 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     return ReadValue(index);
   }
 
-  public bool TryGet(in TKey key, out TValue value)
+  public bool TryGet(in TKey key, out TValue value, ref KeyHashProvider<TKey> keyHashProvider)
   {
     var searchHint = SearchHints?.Value;
     var direction = searchHint?.Direction ?? 0;

@@ -2,6 +2,7 @@ using ZoneTree.Collections;
 using ZoneTree.Collections.BTree;
 using ZoneTree.Comparers;
 using ZoneTree.Core;
+using ZoneTree.Hashers;
 using ZoneTree.Options;
 using ZoneTree.WAL;
 
@@ -21,7 +22,7 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
 
   readonly BTree<TKey, TValue> BTree;
 
-  readonly ConcurrentBloomFilter<TKey> BloomFilter;
+  readonly ConcurrentBloomFilter BloomFilter;
 
   readonly IRefComparer<TKey> Comparer;
 
@@ -112,7 +113,7 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
       var value = values[i];
       // TODO: Search if we can create faster construction
       // of mutable segment from log entries.
-      BloomFilter?.Add(in key);
+      AddToBloomFilter(in key);
       BTree.Upsert(in key, in value, out var _);
     }
   }
@@ -136,26 +137,24 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
       {
         continue;
       }
-      BloomFilter?.Add(in key);
+      AddToBloomFilter(in key);
       BTree.Upsert(in key, in value, out var _);
     }
   }
 
-  public bool ContainsKey(in TKey key)
+  public bool ContainsKey(in TKey key, ref KeyHashProvider<TKey> keyHashProvider)
   {
-    if (BTree.Length == 0)
-      return false;
-    if (BloomFilter != null &&
-        !BloomFilter.MightContain(in key))
+    if (BTree.Length == 0 || BloomFilter != null &&
+        !BloomFilter.MightContain(keyHashProvider.GetHashCode(in key, Options.KeyHasher)))
       return false;
     return BTree.ContainsKey(key);
   }
 
-  public bool TryGet(in TKey key, out TValue value)
+  public bool TryGet(in TKey key, out TValue value, ref KeyHashProvider<TKey> keyHashProvider)
   {
     if (BTree.Length == 0 ||
         (BloomFilter != null &&
-         !BloomFilter.MightContain(in key)))
+         !BloomFilter.MightContain(keyHashProvider.GetHashCode(in key, Options.KeyHasher))))
     {
       value = default;
       return false;
@@ -180,7 +179,7 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
         opIndex = 0;
         return AddOrUpdateResult.RETRY_SEGMENT_IS_FULL;
       }
-      BloomFilter?.Add(in key);
+      AddToBloomFilter(in key);
       var result = BTree.Upsert(in key, in value, out opIndex);
       WriteAheadLog.Append(in key, in value, opIndex);
       return result ? AddOrUpdateResult.ADDED : AddOrUpdateResult.UPDATED;
@@ -211,7 +210,7 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
         opIndex = 0;
         return AddOrUpdateResult.RETRY_SEGMENT_IS_FULL;
       }
-      BloomFilter?.Add(in key);
+      AddToBloomFilter(in key);
       var result = BTree.Upsert(in key, valueGetter, out var value, out opIndex);
       WriteAheadLog.Append(in key, in value, opIndex);
       return result ? AddOrUpdateResult.ADDED : AddOrUpdateResult.UPDATED;
@@ -242,7 +241,7 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
 
       TValue insertedValue = default;
 
-      BloomFilter?.Add(in key);
+      AddToBloomFilter(in key);
       var status = BTree
           .AddOrUpdate(key,
               void (ref TValue x) =>
@@ -270,16 +269,20 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
     new Thread(FreezeWriteAheadLog).Start();
   }
 
-  ConcurrentBloomFilter<TKey> CreateBloomFilter(
+  ConcurrentBloomFilter CreateBloomFilter(
       ZoneTreeOptions<TKey, TValue> options)
   {
     var bitsPerItem = options.MutableSegmentBloomFilterBitsPerItem;
     return bitsPerItem == 0 ?
         null :
-        new ConcurrentBloomFilter<TKey>(
+        new ConcurrentBloomFilter(
             MutableSegmentMaxItemCount,
-            bitsPerItem,
-            options.KeyHasher);
+            bitsPerItem);
+  }
+
+  void AddToBloomFilter(in TKey key)
+  {
+    BloomFilter?.Add(Options.KeyHasher.GetHashCode(in key));
   }
 
   void FreezeWriteAheadLog()
