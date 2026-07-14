@@ -41,6 +41,9 @@ internal static class ZoneTreeOptionValidationRules
   public static readonly Rule DiskSegmentMaterializedEntryCacheSize =
       Rule.Min(0);
 
+  public static readonly Rule DiskSegmentSearchHintPrefetchSize =
+      Rule.Min(0);
+
   public static readonly Rule DiskSegmentKeyCacheRecordLifeTimeInMillisecond =
       Rule.MinSeconds(0);
 

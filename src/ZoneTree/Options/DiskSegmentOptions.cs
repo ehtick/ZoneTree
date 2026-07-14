@@ -90,6 +90,17 @@ public sealed class DiskSegmentOptions
       = DiskSegmentDefaultValues.MaterializedEntryCacheSize;
 
   /// <summary>
+  /// Gets or sets the number of adjacent entries prefetched after sequential
+  /// <c>TryGet</c> calls are detected. Larger values can improve sustained
+  /// sequential lookup throughput, but may read and retain more keys and
+  /// values when the access pattern changes. Buffers are allocated lazily per
+  /// disk segment and calling thread. Setting this value to zero disables
+  /// search hints. The default value is 16 entries.
+  /// </summary>
+  public int SearchHintPrefetchSize { get; set; }
+      = DiskSegmentDefaultValues.SearchHintPrefetchSize;
+
+  /// <summary>
   /// Gets or sets the maximum lifetime of a record in the key cache, in milliseconds.
   /// Longer lifetimes can keep cached keys in memory for longer.
   /// Default value is 10,000 milliseconds (10 seconds).

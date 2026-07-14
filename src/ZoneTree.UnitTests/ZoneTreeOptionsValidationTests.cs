@@ -236,6 +236,10 @@ public sealed class ZoneTreeOptionsValidationTests
         "DiskSegmentOptions.MaterializedEntryCacheSize");
 
     yield return Invalid(
+        options => options.DiskSegmentOptions.SearchHintPrefetchSize = -1,
+        "DiskSegmentOptions.SearchHintPrefetchSize");
+
+    yield return Invalid(
         options => options.DiskSegmentOptions.KeyCacheRecordLifeTimeInMillisecond = -1,
         "DiskSegmentOptions.KeyCacheRecordLifeTimeInMillisecond");
 

@@ -130,6 +130,27 @@ public sealed class DiskSegmentFactoryTests
         Assert.That(diskSegment.TryGet(keys[i], out var value), Is.True);
         Assert.That(value, Is.EqualTo(values[i]));
       }
+
+      for (var i = recordCount - 1; i >= 0; --i)
+      {
+        Assert.That(diskSegment.TryGet(keys[i], out var value), Is.True);
+        Assert.That(value, Is.EqualTo(values[i]));
+      }
+
+      int[] mixedIndexes =
+      [
+        0,
+        1,
+        2,
+        recordCount - 1,
+        recordCount - 2,
+        recordCount - 3
+      ];
+      foreach (var index in mixedIndexes)
+      {
+        Assert.That(diskSegment.TryGet(keys[index], out var value), Is.True);
+        Assert.That(value, Is.EqualTo(values[index]));
+      }
     }
 
     DeleteDirectory(dataPath);

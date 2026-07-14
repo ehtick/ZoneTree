@@ -1,15 +1,10 @@
 namespace ZoneTree.Segments.Block;
 
-public sealed class SingleBlockPin
+public sealed class SingleBlockPin(DecompressedBlock device, bool contributeToTheBlockCache)
 {
-  public DecompressedBlock Device;
+  public DecompressedBlock Device = device;
 
-  public bool ContributeToTheBlockCache;
-
-  public SingleBlockPin(DecompressedBlock device)
-  {
-    Device = device;
-  }
+  public bool ContributeToTheBlockCache = contributeToTheBlockCache;
 
   public void SetDevice(DecompressedBlock device) { Device = device; }
 }

@@ -213,6 +213,12 @@ internal static class ZoneTreeOptionsValidator
     if (exception != null)
       return exception;
 
+    exception = ZoneTreeOptionValidationRules.DiskSegmentSearchHintPrefetchSize.Validate(
+        Option(owner, nameof(options.SearchHintPrefetchSize)),
+        options.SearchHintPrefetchSize);
+    if (exception != null)
+      return exception;
+
     exception = ZoneTreeOptionValidationRules.DiskSegmentKeyCacheRecordLifeTimeInMillisecond.Validate(
         Option(owner, nameof(options.KeyCacheRecordLifeTimeInMillisecond)),
         options.KeyCacheRecordLifeTimeInMillisecond);
