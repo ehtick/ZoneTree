@@ -384,6 +384,7 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
       KeyCacheRecordLifeTimeInMillisecond = dsk.KeyCacheRecordLifeTimeInMillisecond,
       KeyCacheSize = dsk.KeyCacheSize,
       MaterializedEntryCacheSize = dsk.MaterializedEntryCacheSize,
+      SearchHintPrefetchSize = dsk.SearchHintPrefetchSize,
       MaximumRecordCount = dsk.MaximumRecordCount,
       MinimumRecordCount = dsk.MinimumRecordCount,
       ValueCacheRecordLifeTimeInMillisecond = dsk.ValueCacheRecordLifeTimeInMillisecond,

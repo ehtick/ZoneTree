@@ -11,6 +11,34 @@ namespace ZoneTree.Segments.Disk;
 
 public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
 {
+  sealed class SearchHint
+  {
+    public readonly BlockPin BlockPin = new()
+    {
+      ContributeToTheBlockCache = true
+    };
+
+    public long LastIndex = -1;
+
+    public int Direction;
+
+    public TKey[] PrefetchedKeys;
+
+    public TValue[] PrefetchedValues;
+
+    public long PrefetchStartIndex;
+
+    public int PrefetchCount;
+
+    public int PrefetchPosition;
+
+    public void EnsurePrefetchBuffers(int prefetchSize)
+    {
+      PrefetchedKeys ??= new TKey[prefetchSize];
+      PrefetchedValues ??= new TValue[prefetchSize];
+    }
+  }
+
   public long SegmentId { get; }
 
   readonly IRefComparer<TKey> Comparer;
@@ -20,6 +48,8 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
   protected readonly ISerializer<TValue> ValueSerializer;
 
   protected readonly int MaterializedEntryCacheSize;
+
+  readonly int SearchHintPrefetchSize;
 
   protected IRandomAccessDevice DataDevice;
 
@@ -40,6 +70,10 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
   bool IsDropped;
 
   readonly Lock DropLock = new();
+
+  readonly ThreadLocal<SearchHint> SearchHints;
+
+  int AreSearchHintsDisposed;
 
   public long Length { get; protected set; }
 
@@ -70,6 +104,9 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     ValueSerializer = options.ValueSerializer;
     var diskOptions = options.DiskSegmentOptions;
     MaterializedEntryCacheSize = diskOptions.MaterializedEntryCacheSize;
+    SearchHintPrefetchSize = diskOptions.SearchHintPrefetchSize;
+    if (SearchHintPrefetchSize > 0)
+      SearchHints = new(() => new());
     CircularKeyCache = new CircularCache<TKey>(
         diskOptions.KeyCacheSize,
         diskOptions.KeyCacheRecordLifeTimeInMillisecond);
@@ -91,6 +128,9 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     ValueSerializer = options.ValueSerializer;
     var diskOptions = options.DiskSegmentOptions;
     MaterializedEntryCacheSize = diskOptions.MaterializedEntryCacheSize;
+    SearchHintPrefetchSize = diskOptions.SearchHintPrefetchSize;
+    if (SearchHintPrefetchSize > 0)
+      SearchHints = new(() => new());
     CircularKeyCache = new CircularCache<TKey>(
         diskOptions.KeyCacheSize,
         diskOptions.KeyCacheRecordLifeTimeInMillisecond);
@@ -131,6 +171,17 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
 
   public bool TryGet(in TKey key, out TValue value)
   {
+    var searchHint = SearchHints?.Value;
+    var direction = searchHint?.Direction ?? 0;
+    if (direction != 0 && TryGetFromSearchHint(
+        searchHint,
+        direction,
+        in key,
+        out value))
+    {
+      return true;
+    }
+
     var sparseArrayLength = SparseArray.Count;
     long lower = 0;
     long upper = Length - 1;
@@ -140,11 +191,15 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
       (var index, var found) = SearchLastSmallerOrEqualPositionInSparseArray(in key);
       if (found)
       {
+        if (searchHint != null)
+          UpdateSearchHint(searchHint, SparseArray[index].Index);
         value = SparseArray[index].Value;
         return true;
       }
       if (index == -1 || index == sparseArrayLength - 1)
       {
+        if (searchHint != null)
+          ResetSearchHint(searchHint);
         value = default;
         return false;
       }
@@ -154,11 +209,142 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
     var result = BinarySearchAlgorithms.BinarySearch(ReadKey, lower, upper, Comparer, in key);
     if (result < 0)
     {
+      if (searchHint != null)
+        ResetSearchHint(searchHint);
       value = default;
       return false;
     }
+    if (searchHint != null)
+      UpdateSearchHint(searchHint, result);
     value = GetValue(result);
     return true;
+  }
+
+  bool TryGetFromSearchHint(
+      SearchHint searchHint,
+      int direction,
+      in TKey key,
+      out TValue value)
+  {
+    var hintedIndex = searchHint.LastIndex + direction;
+    if ((ulong)hintedIndex >= (ulong)Length)
+    {
+      InvalidateSearchHintPrefetch(searchHint);
+      value = default;
+      return false;
+    }
+
+    var position = searchHint.PrefetchPosition;
+    if ((uint)position >= (uint)searchHint.PrefetchCount ||
+        searchHint.PrefetchStartIndex + position != hintedIndex)
+    {
+      if (!PrefetchSearchHint(searchHint, hintedIndex, direction))
+      {
+        InvalidateSearchHintPrefetch(searchHint);
+        value = default;
+        return false;
+      }
+      position = searchHint.PrefetchPosition;
+    }
+
+    var hintedKey = searchHint.PrefetchedKeys[position];
+    if (Comparer.Compare(in hintedKey, in key) != 0)
+    {
+      InvalidateSearchHintPrefetch(searchHint);
+      value = default;
+      return false;
+    }
+
+    value = searchHint.PrefetchedValues[position];
+    searchHint.LastIndex = hintedIndex;
+    searchHint.PrefetchPosition = position + direction;
+    return true;
+  }
+
+  bool PrefetchSearchHint(
+      SearchHint searchHint,
+      long hintedIndex,
+      int direction)
+  {
+    var prefetchSize = (int)Math.Min(SearchHintPrefetchSize, Length);
+    long startIndex;
+    int count;
+    int position;
+    if (direction > 0)
+    {
+      startIndex = hintedIndex;
+      count = (int)Math.Min(prefetchSize, Length - startIndex);
+      position = 0;
+    }
+    else
+    {
+      startIndex = Math.Max(0, hintedIndex - prefetchSize + 1);
+      count = (int)(hintedIndex - startIndex + 1);
+      position = count - 1;
+    }
+
+    searchHint.EnsurePrefetchBuffers(prefetchSize);
+    int readCount;
+    try
+    {
+      readCount = ReadEntries(
+          startIndex,
+          count,
+          searchHint.PrefetchedKeys,
+          searchHint.PrefetchedValues,
+          0,
+          searchHint.BlockPin);
+    }
+    finally
+    {
+      searchHint.BlockPin.Clear();
+    }
+    if (readCount != count)
+      return false;
+
+    searchHint.PrefetchStartIndex = startIndex;
+    searchHint.PrefetchCount = readCount;
+    searchHint.PrefetchPosition = position;
+    return true;
+  }
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  static void UpdateSearchHint(SearchHint searchHint, long index)
+  {
+    var lastIndex = searchHint.LastIndex;
+    searchHint.Direction = lastIndex < 0
+        ? 0
+        : (index - lastIndex) switch
+        {
+          1 => 1,
+          -1 => -1,
+          _ => 0
+        };
+    searchHint.LastIndex = index;
+    ClearSearchHintPrefetch(searchHint);
+  }
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  static void ResetSearchHint(SearchHint searchHint)
+  {
+    searchHint.LastIndex = -1;
+    searchHint.Direction = 0;
+    ClearSearchHintPrefetch(searchHint);
+  }
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  static void InvalidateSearchHintPrefetch(SearchHint searchHint)
+  {
+    searchHint.Direction = 0;
+    ClearSearchHintPrefetch(searchHint);
+  }
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  static void ClearSearchHintPrefetch(SearchHint searchHint)
+  {
+    searchHint.PrefetchCount = 0;
+    searchHint.PrefetchPosition = 0;
+    searchHint.BlockPin.Clear();
   }
 
   public void InitSparseArray(int size)
@@ -305,6 +491,7 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
   {
     if (!disposing)
       return;
+    DisposeSearchHints();
     ReleaseResources();
   }
 
@@ -444,7 +631,16 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
 
   public virtual void ReleaseResources()
   {
+    DisposeSearchHints();
     DataDevice?.Dispose();
+  }
+
+  void DisposeSearchHints()
+  {
+    var searchHints = SearchHints;
+    if (searchHints != null &&
+        Interlocked.Exchange(ref AreSearchHintsDisposed, 1) == 0)
+      searchHints.Dispose();
   }
 
   public abstract int ReleaseReadBuffers(long ticks);

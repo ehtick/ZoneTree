@@ -1,28 +1,17 @@
 namespace ZoneTree.Segments.Block;
 
-public sealed class BlockPin
+public sealed class BlockPin(DecompressedBlock device1 = null, DecompressedBlock device2 = null)
 {
-  public DecompressedBlock Device1;
+  public DecompressedBlock Device1 = device1;
 
-  public DecompressedBlock Device2;
+  public DecompressedBlock Device2 = device2;
 
   public bool ContributeToTheBlockCache;
 
-  public BlockPin(DecompressedBlock device1 = null, DecompressedBlock device2 = null)
-  {
-    Device1 = device1;
-    Device2 = device2;
-  }
   public SingleBlockPin ToSingleBlockPin(int num)
   {
-    if (num == 1) return new SingleBlockPin(Device1)
-    {
-      ContributeToTheBlockCache = ContributeToTheBlockCache
-    };
-    if (num == 2) return new SingleBlockPin(Device2)
-    {
-      ContributeToTheBlockCache = ContributeToTheBlockCache
-    };
+    if (num == 1) return new SingleBlockPin(Device1, ContributeToTheBlockCache);
+    if (num == 2) return new SingleBlockPin(Device2, ContributeToTheBlockCache);
     throw new ArgumentException("Supported device numbers are 1 and 2 but given " + num);
   }
 
@@ -35,6 +24,11 @@ public sealed class BlockPin
   {
     Device2 = device;
   }
-}
 
+  public void Clear()
+  {
+    SetDevice1(null);
+    SetDevice2(null);
+  }
+}
 

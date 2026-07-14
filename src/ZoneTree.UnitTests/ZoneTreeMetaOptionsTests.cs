@@ -21,6 +21,9 @@ public sealed class ZoneTreeMetaOptionsTests
       Assert.That(
           zoneTree.Maintenance.CloneOptions().DiskSegmentOptions.MaterializedEntryCacheSize,
           Is.EqualTo(expected.DiskSegmentMaterializedEntryCacheSize));
+      Assert.That(
+          zoneTree.Maintenance.CloneOptions().DiskSegmentOptions.SearchHintPrefetchSize,
+          Is.EqualTo(expected.DiskSegmentSearchHintPrefetchSize));
       AssertMetadataOptions(dataPath, expected);
     }
     finally
@@ -91,6 +94,7 @@ public sealed class ZoneTreeMetaOptionsTests
           options.KeyCacheSize = expected.DiskSegmentKeyCacheSize;
           options.ValueCacheSize = expected.DiskSegmentValueCacheSize;
           options.MaterializedEntryCacheSize = expected.DiskSegmentMaterializedEntryCacheSize;
+          options.SearchHintPrefetchSize = expected.DiskSegmentSearchHintPrefetchSize;
           options.KeyCacheRecordLifeTimeInMillisecond =
               expected.DiskSegmentKeyCacheRecordLifeTimeInMillisecond;
           options.ValueCacheRecordLifeTimeInMillisecond =
@@ -127,6 +131,7 @@ public sealed class ZoneTreeMetaOptionsTests
           DiskSegmentKeyCacheSize: 11,
           DiskSegmentValueCacheSize: 13,
           DiskSegmentMaterializedEntryCacheSize: 17,
+          DiskSegmentSearchHintPrefetchSize: 19,
           DiskSegmentKeyCacheRecordLifeTimeInMillisecond: 23,
           DiskSegmentValueCacheRecordLifeTimeInMillisecond: 29,
           DefaultSparseArrayStepSize: 31),
@@ -152,6 +157,7 @@ public sealed class ZoneTreeMetaOptionsTests
           DiskSegmentKeyCacheSize: 17,
           DiskSegmentValueCacheSize: 19,
           DiskSegmentMaterializedEntryCacheSize: 23,
+          DiskSegmentSearchHintPrefetchSize: 29,
           DiskSegmentKeyCacheRecordLifeTimeInMillisecond: 31,
           DiskSegmentValueCacheRecordLifeTimeInMillisecond: 37,
           DefaultSparseArrayStepSize: 41),
@@ -177,6 +183,7 @@ public sealed class ZoneTreeMetaOptionsTests
           DiskSegmentKeyCacheSize: 23,
           DiskSegmentValueCacheSize: 29,
           DiskSegmentMaterializedEntryCacheSize: 31,
+          DiskSegmentSearchHintPrefetchSize: 37,
           DiskSegmentKeyCacheRecordLifeTimeInMillisecond: 41,
           DiskSegmentValueCacheRecordLifeTimeInMillisecond: 43,
           DefaultSparseArrayStepSize: 47),
@@ -223,6 +230,8 @@ public sealed class ZoneTreeMetaOptionsTests
     Assert.That(diskOptions.ValueCacheSize, Is.EqualTo(expected.DiskSegmentValueCacheSize));
     Assert.That(diskOptions.MaterializedEntryCacheSize,
         Is.EqualTo(expected.DiskSegmentMaterializedEntryCacheSize));
+    Assert.That(diskOptions.SearchHintPrefetchSize,
+        Is.EqualTo(expected.DiskSegmentSearchHintPrefetchSize));
     Assert.That(diskOptions.KeyCacheRecordLifeTimeInMillisecond,
         Is.EqualTo(expected.DiskSegmentKeyCacheRecordLifeTimeInMillisecond));
     Assert.That(diskOptions.ValueCacheRecordLifeTimeInMillisecond,
@@ -272,6 +281,7 @@ public sealed class ZoneTreeMetaOptionsTests
       int DiskSegmentKeyCacheSize,
       int DiskSegmentValueCacheSize,
       int DiskSegmentMaterializedEntryCacheSize,
+      int DiskSegmentSearchHintPrefetchSize,
       int DiskSegmentKeyCacheRecordLifeTimeInMillisecond,
       int DiskSegmentValueCacheRecordLifeTimeInMillisecond,
       int DefaultSparseArrayStepSize);
