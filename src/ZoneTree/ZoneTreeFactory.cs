@@ -11,6 +11,7 @@ using ZoneTree.Logger;
 using ZoneTree.Segments.RandomAccess;
 using ZoneTree.PresetTypes;
 using ZoneTree.Backup;
+using ZoneTree.Hashers;
 
 namespace ZoneTree;
 
@@ -87,6 +88,18 @@ public sealed class ZoneTreeFactory<TKey, TValue>
   }
 
   /// <summary>
+  /// Sets the key hasher.
+  /// </summary>
+  /// <param name="keyHasher">The key hasher.</param>
+  /// <returns>ZoneTree Factory</returns>
+  public ZoneTreeFactory<TKey, TValue> SetKeyHasher(
+      IKeyHasher<TKey> keyHasher)
+  {
+    Options.KeyHasher = keyHasher;
+    return this;
+  }
+
+  /// <summary>
   /// Configures mutable segment maximum item count.
   /// </summary>
   /// <param name="mutableSegmentMaxItemCount">The maximum item count</param>
@@ -95,6 +108,19 @@ public sealed class ZoneTreeFactory<TKey, TValue>
       SetMutableSegmentMaxItemCount(int mutableSegmentMaxItemCount)
   {
     Options.MutableSegmentMaxItemCount = mutableSegmentMaxItemCount;
+    return this;
+  }
+
+  /// <summary>
+  /// Configures the requested Bloom-filter bits per mutable-segment item.
+  /// Setting this value to zero disables the mutable-segment Bloom filter.
+  /// </summary>
+  /// <param name="bitsPerItem">The requested number of bits per item.</param>
+  /// <returns>ZoneTree Factory</returns>
+  public ZoneTreeFactory<TKey, TValue>
+      SetMutableSegmentBloomFilterBitsPerItem(int bitsPerItem)
+  {
+    Options.MutableSegmentBloomFilterBitsPerItem = bitsPerItem;
     return this;
   }
 
@@ -331,6 +357,7 @@ public sealed class ZoneTreeFactory<TKey, TValue>
     }
     Options.CreateDefaultDeleteDelegates();
     FillComparer();
+    FillKeyHasher();
     FillKeySerializer();
     FillValueSerializer();
   }
@@ -340,6 +367,13 @@ public sealed class ZoneTreeFactory<TKey, TValue>
     if (Options.Comparer != null)
       return;
     Options.Comparer = ComponentsForKnownTypes.GetComparer<TKey>();
+  }
+
+  void FillKeyHasher()
+  {
+    if (Options.KeyHasher != null)
+      return;
+    Options.KeyHasher = ComponentsForKnownTypes.GetKeyHasher<TKey>();
   }
 
   void FillKeySerializer()

@@ -147,11 +147,14 @@ public sealed class LiveBackupRestore<TKey, TValue>
     var meta = new ZoneTreeMeta
     {
       ComparerType = Options.Comparer.GetType().SimplifiedFullName(),
+      KeyHasherType = Options.KeyHasher?.GetType().SimplifiedFullName(),
       KeyType = typeof(TKey).SimplifiedFullName(),
       ValueType = typeof(TValue).SimplifiedFullName(),
       KeySerializerType = Options.KeySerializer.GetType().SimplifiedFullName(),
       ValueSerializerType = Options.ValueSerializer.GetType().SimplifiedFullName(),
       MutableSegmentMaxItemCount = Options.MutableSegmentMaxItemCount,
+      MutableSegmentBloomFilterBitsPerItem =
+          Options.MutableSegmentBloomFilterBitsPerItem,
       DiskSegmentMaxItemCount = Options.DiskSegmentMaxItemCount,
       WriteAheadLogOptions = Options.WriteAheadLogOptions,
       DiskSegmentOptions = Options.DiskSegmentOptions,

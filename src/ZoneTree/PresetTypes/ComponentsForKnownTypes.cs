@@ -3,6 +3,7 @@ using ZoneTree.Comparers;
 using ZoneTree.Exceptions;
 using ZoneTree.Options;
 using ZoneTree.Serializers;
+using ZoneTree.Hashers;
 
 namespace ZoneTree.PresetTypes;
 
@@ -49,6 +50,35 @@ public static class ComponentsForKnownTypes
       throw new ZoneTreeException("ZoneTree<byte[], ...> is not supported. Use ZoneTree<Memory<byte>, ...> instead.");
     }
     return comparer;
+  }
+
+  /// <summary>
+  /// Returns a key hasher for a known key type.
+  /// </summary>
+  /// <typeparam name="TKey">The key type.</typeparam>
+  /// <returns>
+  /// An implementation of <see cref="IKeyHasher{TKey}"/> appropriate for the
+  /// type, or null if the type is unsupported.
+  /// </returns>
+  public static IKeyHasher<TKey> GetKeyHasher<TKey>()
+  {
+    TKey key = default;
+    var isKnownType = key is byte or char or DateTime or decimal or double or
+        short or ushort or int or uint or long or ulong or Guid;
+
+    if (isKnownType || typeof(TKey) == typeof(string))
+      return new DefaultKeyHasher<TKey>();
+
+    if (typeof(TKey) == typeof(Memory<byte>))
+      return new ByteArrayKeyHasher() as IKeyHasher<TKey>;
+
+    if (typeof(TKey) == typeof(byte[]))
+    {
+      throw new ZoneTreeException(
+          "ZoneTree<byte[], ...> is not supported. " +
+          "Use ZoneTree<Memory<byte>, ...> instead.");
+    }
+    return null;
   }
 
   /// <summary>

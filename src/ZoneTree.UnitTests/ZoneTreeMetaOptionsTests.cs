@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ZoneTree.Core;
+using ZoneTree.Hashers;
 using ZoneTree.Options;
 using ZoneTree.WAL;
 
@@ -7,6 +8,22 @@ namespace ZoneTree.UnitTests;
 
 public sealed class ZoneTreeMetaOptionsTests
 {
+  [Test]
+  public void MetadataWithoutHasherAndBloomOptionsUsesDefaults()
+  {
+    const string json = """
+        {
+          "Version": "1.0.0"
+        }
+        """;
+
+    var meta = JsonSerializer.Deserialize<ZoneTreeMeta>(json);
+
+    Assert.That(meta, Is.Not.Null);
+    Assert.That(meta.KeyHasherType, Is.Null);
+    Assert.That(meta.MutableSegmentBloomFilterBitsPerItem, Is.Zero);
+  }
+
   [Test]
   public void CreatePersistsActiveOptionsInMetadata()
   {
@@ -67,6 +84,8 @@ public sealed class ZoneTreeMetaOptionsTests
         .SetDataDirectory(dataPath)
         .Configure(options => options.AllowUnsafeOptionValues = true)
         .SetMutableSegmentMaxItemCount(expected.MutableSegmentMaxItemCount)
+        .SetMutableSegmentBloomFilterBitsPerItem(
+            expected.MutableSegmentBloomFilterBitsPerItem)
         .SetDiskSegmentMaxItemCount(expected.DiskSegmentMaxItemCount)
         .ConfigureWriteAheadLogOptions(options =>
         {
@@ -112,6 +131,7 @@ public sealed class ZoneTreeMetaOptionsTests
     {
       CompressionMethod.LZ4 => new ExpectedOptions(
           MutableSegmentMaxItemCount: 37,
+          MutableSegmentBloomFilterBitsPerItem: 5,
           DiskSegmentMaxItemCount: 73,
           WriteAheadLogMode: WriteAheadLogMode.Sync,
           WriteAheadLogCustomOptions: customOptions,
@@ -138,6 +158,7 @@ public sealed class ZoneTreeMetaOptionsTests
 
       CompressionMethod.Zstd => new ExpectedOptions(
           MutableSegmentMaxItemCount: 41,
+          MutableSegmentBloomFilterBitsPerItem: 7,
           DiskSegmentMaxItemCount: 83,
           WriteAheadLogMode: WriteAheadLogMode.SyncCompressed,
           WriteAheadLogCustomOptions: customOptions,
@@ -164,6 +185,7 @@ public sealed class ZoneTreeMetaOptionsTests
 
       CompressionMethod.Brotli => new ExpectedOptions(
           MutableSegmentMaxItemCount: 43,
+          MutableSegmentBloomFilterBitsPerItem: 11,
           DiskSegmentMaxItemCount: 89,
           WriteAheadLogMode: WriteAheadLogMode.SyncCompressed,
           WriteAheadLogCustomOptions: customOptions,
@@ -201,7 +223,13 @@ public sealed class ZoneTreeMetaOptionsTests
     var meta = JsonSerializer.Deserialize<ZoneTreeMeta>(json);
 
     Assert.That(meta, Is.Not.Null);
+    Assert.That(
+        meta.KeyHasherType,
+        Is.EqualTo(typeof(DefaultKeyHasher<string>).SimplifiedFullName()));
     Assert.That(meta.MutableSegmentMaxItemCount, Is.EqualTo(expected.MutableSegmentMaxItemCount));
+    Assert.That(
+        meta.MutableSegmentBloomFilterBitsPerItem,
+        Is.EqualTo(expected.MutableSegmentBloomFilterBitsPerItem));
     Assert.That(meta.DiskSegmentMaxItemCount, Is.EqualTo(expected.DiskSegmentMaxItemCount));
 
     var walOptions = meta.WriteAheadLogOptions;
@@ -240,6 +268,14 @@ public sealed class ZoneTreeMetaOptionsTests
         Is.EqualTo(expected.DefaultSparseArrayStepSize));
 
     using var document = JsonDocument.Parse(json);
+    Assert.That(
+        document.RootElement.GetProperty(nameof(ZoneTreeMeta.KeyHasherType)).GetString(),
+        Is.EqualTo(typeof(DefaultKeyHasher<string>).SimplifiedFullName()));
+    Assert.That(
+        document.RootElement
+            .GetProperty(nameof(ZoneTreeMeta.MutableSegmentBloomFilterBitsPerItem))
+            .GetInt32(),
+        Is.EqualTo(expected.MutableSegmentBloomFilterBitsPerItem));
     var persistedCustomOptions = document.RootElement
         .GetProperty(nameof(ZoneTreeMeta.WriteAheadLogOptions))
         .GetProperty(nameof(WriteAheadLogOptions.CustomOptions))
@@ -262,6 +298,7 @@ public sealed class ZoneTreeMetaOptionsTests
 
   sealed record ExpectedOptions(
       int MutableSegmentMaxItemCount,
+      int MutableSegmentBloomFilterBitsPerItem,
       int DiskSegmentMaxItemCount,
       WriteAheadLogMode WriteAheadLogMode,
       string WriteAheadLogCustomOptions,

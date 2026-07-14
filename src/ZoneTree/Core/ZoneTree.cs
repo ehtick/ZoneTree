@@ -189,6 +189,7 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
     if (MutableSegment != null)
       ZoneTreeMeta.MutableSegment = MutableSegment.SegmentId;
     ZoneTreeMeta.ComparerType = Options.Comparer.GetType().SimplifiedFullName();
+    ZoneTreeMeta.KeyHasherType = Options.KeyHasher?.GetType().SimplifiedFullName();
     ZoneTreeMeta.KeyType = typeof(TKey).SimplifiedFullName();
     ZoneTreeMeta.ValueType = typeof(TValue).SimplifiedFullName();
     ZoneTreeMeta.KeySerializerType = Options.KeySerializer.GetType().SimplifiedFullName();
@@ -197,6 +198,8 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
     ZoneTreeMeta.ReadOnlySegments = ReadOnlySegmentQueue.Select(x => x.SegmentId).ToArray();
     ZoneTreeMeta.BottomSegments = BottomSegmentQueue.Select(x => x.SegmentId).ToArray();
     ZoneTreeMeta.MutableSegmentMaxItemCount = Options.MutableSegmentMaxItemCount;
+    ZoneTreeMeta.MutableSegmentBloomFilterBitsPerItem =
+        Options.MutableSegmentBloomFilterBitsPerItem;
     ZoneTreeMeta.DiskSegmentMaxItemCount = Options.DiskSegmentMaxItemCount;
     ZoneTreeMeta.WriteAheadLogOptions = Options.WriteAheadLogOptions;
     ZoneTreeMeta.DiskSegmentOptions = Options.DiskSegmentOptions;
@@ -402,9 +405,12 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
       DiskSegmentOptions = clonesDiskSegmentOptions,
       EnableSingleSegmentGarbageCollection = options.EnableSingleSegmentGarbageCollection,
       IsDeleted = options.IsDeleted,
+      KeyHasher = options.KeyHasher,
       KeySerializer = options.KeySerializer,
       Logger = options.Logger,
       MarkValueDeleted = options.MarkValueDeleted,
+      MutableSegmentBloomFilterBitsPerItem =
+          options.MutableSegmentBloomFilterBitsPerItem,
       MutableSegmentMaxItemCount = options.MutableSegmentMaxItemCount,
       RandomAccessDeviceManager = options.RandomAccessDeviceManager,
       ValueSerializer = options.ValueSerializer,

@@ -23,6 +23,9 @@ internal static class ZoneTreeOptionsValidator
     if (options.Comparer == null)
       return new MissingOptionException(nameof(options.Comparer));
 
+    if (options.KeyHasher == null)
+      return new MissingOptionException(nameof(options.KeyHasher));
+
     if (options.IsDeleted == null)
       return new MissingOptionException(nameof(options.IsDeleted));
 
@@ -44,7 +47,11 @@ internal static class ZoneTreeOptionsValidator
     if (options.DiskSegmentOptions == null)
       return new MissingOptionException(nameof(options.DiskSegmentOptions));
 
-    Exception exception = ValidateDefinedEnum(
+    Exception exception = ValidateCommonKeyHasherCompatibility(options);
+    if (exception != null)
+      return exception;
+
+    exception = ValidateDefinedEnum(
         nameof(options.BTreeLockMode),
         options.BTreeLockMode);
     if (exception != null)
@@ -62,6 +69,28 @@ internal static class ZoneTreeOptionsValidator
       return null;
 
     return ValidateOptionValues(options);
+  }
+
+  static InvalidOptionValueException ValidateCommonKeyHasherCompatibility<TKey, TValue>(
+      ZoneTreeOptions<TKey, TValue> options)
+  {
+    if (typeof(TKey) != typeof(string))
+      return null;
+
+    var lowerCase = (TKey)(object)"a";
+    var upperCase = (TKey)(object)"A";
+    if (options.Comparer.Compare(in lowerCase, in upperCase) != 0)
+      return null;
+
+    var lowerCaseHash = options.KeyHasher.GetHashCode(in lowerCase);
+    var upperCaseHash = options.KeyHasher.GetHashCode(in upperCase);
+    if (lowerCaseHash == upperCaseHash)
+      return null;
+
+    return new InvalidOptionValueException(
+        nameof(options.KeyHasher),
+        options.KeyHasher.GetType().Name,
+        "Keys considered equal by Comparer must produce the same hash code");
   }
 
   static Exception ValidateWriteAheadLogOptions(WriteAheadLogOptions options)
@@ -116,6 +145,12 @@ internal static class ZoneTreeOptionsValidator
     Exception exception = ZoneTreeOptionValidationRules.MutableSegmentMaxItemCount.Validate(
         nameof(options.MutableSegmentMaxItemCount),
         options.MutableSegmentMaxItemCount);
+    if (exception != null)
+      return exception;
+
+    exception = ZoneTreeOptionValidationRules.MutableSegmentBloomFilterBitsPerItem.Validate(
+        nameof(options.MutableSegmentBloomFilterBitsPerItem),
+        options.MutableSegmentBloomFilterBitsPerItem);
     if (exception != null)
       return exception;
 
