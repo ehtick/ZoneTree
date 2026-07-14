@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text.Json;
 using ZoneTree.Backup;
 using ZoneTree.Logger;
@@ -410,7 +409,15 @@ public sealed class LiveBackupTests
     Assert.That(exception, Is.Not.Null);
     Assert.That(exception.InnerException, Is.TypeOf<InvalidOperationException>());
 
-    Assert.That(GetIteratorReaderCount(diskSegment), Is.EqualTo(0));
+    var diskSegmentFiles = diskSegment.GetFiles();
+    Assert.That(diskSegmentFiles, Is.Not.Empty);
+
+    diskSegment.Drop();
+
+    Assert.That(
+        diskSegmentFiles.All(file => !File.Exists(file.Path)),
+        Is.True,
+        "The failed backup left an iterator lease attached to the disk segment.");
 
     backup.Stop();
     zoneTree.Maintenance.Drop();
@@ -905,23 +912,6 @@ public sealed class LiveBackupTests
             backupPath,
             file.BackupPath.Replace('/', Path.DirectorySeparatorChar))),
         Is.True);
-  }
-
-  static int GetIteratorReaderCount(IDiskSegment<int, int> diskSegment)
-  {
-    var type = diskSegment.GetType();
-    while (type != null)
-    {
-      var field = type.GetField(
-          "IteratorReaderCount",
-          BindingFlags.Instance | BindingFlags.NonPublic);
-      if (field != null)
-        return (int)field.GetValue(diskSegment);
-      type = type.BaseType;
-    }
-    throw new MissingFieldException(
-        diskSegment.GetType().FullName,
-        "IteratorReaderCount");
   }
 
   public sealed class TestLiveBackupGenerationCatalog

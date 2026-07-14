@@ -1,4 +1,6 @@
+using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using ZoneTree.Collections;
 using ZoneTree.Comparers;
 using ZoneTree.Exceptions;
@@ -6,11 +8,24 @@ using ZoneTree.Options;
 using ZoneTree.Segments.Block;
 using ZoneTree.Segments.RandomAccess;
 using ZoneTree.Serializers;
+using ZoneTree.Synchronization;
 
 namespace ZoneTree.Segments.Disk;
 
+[StructLayout(LayoutKind.Explicit, Size = 64)]
+struct ReadCounterStripe
+{
+  [FieldOffset(0)]
+  public int Value;
+}
+
 public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
 {
+  static readonly int ReadCounterStripeCount = (int)BitOperations.RoundUpToPowerOf2(
+      (uint)Math.Min(Environment.ProcessorCount, 64));
+
+  static readonly int ReadCounterStripeMask = ReadCounterStripeCount - 1;
+
   sealed class SearchHint
   {
     public readonly BlockPin BlockPin = new()
@@ -59,15 +74,17 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
 
   protected IReadOnlyList<SparseArrayEntry<TKey, TValue>> SparseArray = Array.Empty<SparseArrayEntry<TKey, TValue>>();
 
-  int IteratorReaderCount;
+  LifecycleLeaseState IteratorLeaseState;
 
-  protected volatile int ReadCount;
+  /// <summary>
+  /// Gets the number of active iterator leases.
+  /// </summary>
+  public long IteratorReaderCount => IteratorLeaseState.LeaseCount;
 
-  volatile bool IsDropRequested;
+  readonly ReadCounterStripe[] ReadCounterStripes =
+      new ReadCounterStripe[ReadCounterStripeCount];
 
   protected volatile bool IsDropping;
-
-  bool IsDropped;
 
   readonly Lock DropLock = new();
 
@@ -90,6 +107,18 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
   public CircularCache<TKey> CircularKeyCache { get; }
 
   public CircularCache<TValue> CircularValueCache { get; }
+
+  protected int ActiveReadCount
+  {
+    get
+    {
+      var result = 0;
+      var stripes = ReadCounterStripes;
+      for (var i = 0; i < stripes.Length; ++i)
+        result += Volatile.Read(ref stripes[i].Value);
+      return result;
+    }
+  }
 
   protected ZoneTreeOptions<TKey, TValue> Options;
 
@@ -395,6 +424,24 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
 
   protected TValue ReadValue(long index) => ReadValue(index, null);
 
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  protected int BeginRead()
+  {
+    var stripeIndex = Thread.GetCurrentProcessorId() & ReadCounterStripeMask;
+    Interlocked.Increment(ref ReadCounterStripes[stripeIndex].Value);
+    if (!IsDropping)
+      return stripeIndex;
+
+    Interlocked.Decrement(ref ReadCounterStripes[stripeIndex].Value);
+    throw new DiskSegmentIsDroppingException();
+  }
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  protected void EndRead(int stripeIndex)
+  {
+    Interlocked.Decrement(ref ReadCounterStripes[stripeIndex].Value);
+  }
+
   protected abstract TKey ReadKey(long index, BlockPin blockPin);
 
   protected abstract TValue ReadValue(long index, BlockPin blockPin);
@@ -499,36 +546,11 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
   {
     lock (DropLock)
     {
-      if (IsDropped)
-        return;
-      if (IteratorReaderCount > 0)
-      {
-        // iterators are long-lived objects.
-        // Cancel the drop, and let the iterators
-        // call drop when they are disposed.
-        IsDropRequested = true;
-        return;
-      }
-
-      // reads will increase ReadCount when they begin,
-      // and decrease ReadCount when they end.
-      IsDropping = true;
-      // After the flag change,
-      // reads will start throwing DiskSegmentIsDroppingException
-
-      // Delay the drop operation until all reads finalized
-      // either with success or exception.
-      if (ReadCount > 0)
-      {
-        // Synchronize reads with drop operation.
-        SpinWait.SpinUntil(() => ReadCount == 0);
-      }
-
-      // No active reads remaining.
-      // Safe to drop.
-
-      DeleteDevices();
-      IsDropped = true;
+      // Request retirement and prevent new iterators from attaching.
+      // Complete the drop immediately when no iterators are active;
+      // otherwise, the final iterator completes it when detached.
+      if (IteratorLeaseState.RequestRetirement())
+        CompleteDrop(reportFailure: false);
     }
   }
 
@@ -541,28 +563,53 @@ public abstract class DiskSegment<TKey, TValue> : IDiskSegment<TKey, TValue>
 
   public void AttachIterator()
   {
-    lock (DropLock)
-    {
-      ++IteratorReaderCount;
-    }
+    if (!IteratorLeaseState.TryAcquire())
+      throw new InvalidOperationException(
+          "Cannot attach an iterator after disk segment retirement has started.");
   }
 
   public void DetachIterator()
   {
-    lock (DropLock)
+    if (IteratorLeaseState.Release())
     {
-      --IteratorReaderCount;
-      if (IsDropRequested && IteratorReaderCount == 0)
+      lock (DropLock)
       {
-        try
-        {
-          Drop();
-        }
-        catch (Exception e)
-        {
-          DropFailureReporter?.Invoke(this, e);
-        }
+        if (IteratorLeaseState.TryBeginRetirementCompletion())
+          CompleteDrop(reportFailure: true);
       }
+    }
+  }
+
+  void CompleteDrop(bool reportFailure)
+  {
+    try
+    {
+      // reads will increase ReadCount when they begin,
+      // and decrease ReadCount when they end.
+      IsDropping = true;
+      // After the flag change,
+      // reads will start throwing DiskSegmentIsDroppingException
+
+      // Delay the drop operation until all reads finalized
+      // either with success or exception.
+      if (ActiveReadCount != 0)
+      {
+        // Synchronize reads with drop operation.
+        SpinWait.SpinUntil(() => ActiveReadCount == 0);
+      }
+
+      // No active reads remaining.
+      // Safe to drop.
+
+      DeleteDevices();
+      IteratorLeaseState.CompleteRetirement();
+    }
+    catch (Exception e)
+    {
+      IteratorLeaseState.CancelRetirementCompletion();
+      if (!reportFailure)
+        throw;
+      DropFailureReporter?.Invoke(this, e);
     }
   }
 

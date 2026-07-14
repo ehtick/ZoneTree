@@ -147,14 +147,10 @@ public sealed class FixedSizeValueDiskSegment<TKey, TValue> : DiskSegment<TKey, 
 
   protected unsafe override TKey ReadKey(long index, BlockPin blockPin)
   {
+    if (CircularKeyCache.TryGet(index, out var key)) return key;
+    var readStripe = BeginRead();
     try
     {
-      if (CircularKeyCache.TryGet(index, out var key)) return key;
-      Interlocked.Increment(ref ReadCount);
-      if (IsDropping)
-      {
-        throw new DiskSegmentIsDroppingException();
-      }
       var pin1 = blockPin?.ToSingleBlockPin(1);
       var pin2 = blockPin?.ToSingleBlockPin(2);
       var headSize = sizeof(KeyHead) + ValueSize;
@@ -175,21 +171,16 @@ public sealed class FixedSizeValueDiskSegment<TKey, TValue> : DiskSegment<TKey, 
     }
     finally
     {
-      Interlocked.Decrement(ref ReadCount);
+      EndRead(readStripe);
     }
   }
 
   protected unsafe override TValue ReadValue(long index, BlockPin blockPin)
   {
+    if (CircularValueCache.TryGet(index, out var value)) return value;
+    var readStripe = BeginRead();
     try
     {
-      if (CircularValueCache.TryGet(index, out var value)) return value;
-      Interlocked.Increment(ref ReadCount);
-      if (IsDropping)
-      {
-        throw new DiskSegmentIsDroppingException();
-      }
-
       var pin1 = blockPin?.ToSingleBlockPin(1);
       var headSize = sizeof(KeyHead) + ValueSize;
       var valueBytes = DataHeaderDevice.GetBytes(
@@ -203,7 +194,7 @@ public sealed class FixedSizeValueDiskSegment<TKey, TValue> : DiskSegment<TKey, 
     }
     finally
     {
-      Interlocked.Decrement(ref ReadCount);
+      EndRead(readStripe);
     }
   }
 
@@ -219,14 +210,9 @@ public sealed class FixedSizeValueDiskSegment<TKey, TValue> : DiskSegment<TKey, 
       return 0;
     count = (int)Math.Min(count, Length - startIndex);
 
+    var readStripe = BeginRead();
     try
     {
-      Interlocked.Increment(ref ReadCount);
-      if (IsDropping)
-      {
-        throw new DiskSegmentIsDroppingException();
-      }
-
       var pin1 = blockPin?.ToSingleBlockPin(1);
       var pin2 = blockPin?.ToSingleBlockPin(2);
       var headSize = sizeof(KeyHead) + ValueSize;
@@ -276,7 +262,7 @@ public sealed class FixedSizeValueDiskSegment<TKey, TValue> : DiskSegment<TKey, 
     }
     finally
     {
-      Interlocked.Decrement(ref ReadCount);
+      EndRead(readStripe);
     }
   }
 
