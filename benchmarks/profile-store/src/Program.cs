@@ -34,7 +34,7 @@ try
 
   if (config.ChildRun)
   {
-    var childConfig = config.ForProfileCount(config.Profiles);
+    var childConfig = config.ForProfileCount(config.Profiles).ForParallelism(config.Parallelism);
     var result = await new BenchmarkRunner(childConfig).RunSingleAsync(CancellationToken.None);
     if (config.ResultFile != null)
     {
@@ -52,7 +52,11 @@ try
   }
 
   foreach (var profileCount in config.ProfileCounts)
-    await RunProfileCountAsync(config.ForProfileCount(profileCount), engines, CancellationToken.None);
+  {
+    var profileConfig = config.ForProfileCount(profileCount);
+    foreach (var parallelism in config.ParallelismLevels)
+      await RunProfileCountAsync(profileConfig.ForParallelism(parallelism), engines, CancellationToken.None);
+  }
 }
 catch (HelpRequestedException)
 {
@@ -72,6 +76,7 @@ static void PrintHelp()
       Options:
         --engine zonetree|rocksdb|sqlite|mysql|all|comma,list
         --profiles <count|count,list>
+        --parallelism <count|count,list>
         --read-count <count>
         --email-read-count <count>
         --query-count <count>
@@ -108,7 +113,7 @@ static void PrintHelp()
         --update-latest
 
       Example:
-        dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --engine zonetree,rocksdb,sqlite --profiles 100K,1M
+        dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --engine zonetree,rocksdb,sqlite --profiles 100K,1M --parallelism 1,4,8
       """);
 }
 
@@ -232,7 +237,10 @@ static async Task UpdateLatestAsync(IReadOnlyList<BenchmarkResult> results, Canc
   if (results.Count == 0)
     throw new InvalidOperationException("Benchmark results are empty.");
 
-  var profileDirectory = $"profiles-{results[0].Workload.Profiles.ToString(CultureInfo.InvariantCulture)}";
+  var profileDirectory = ResultWriter.GetProfileOutputDirectory(
+      "",
+      results[0].Workload.Profiles,
+      results[0].Workload.Parallelism);
   var referenceDirectory = Path.Combine(
       FindBenchmarkDirectory(),
       "reference",
@@ -303,7 +311,7 @@ static async Task<IReadOnlyList<BenchmarkResult>> RunChildProcessesAsync(
     CancellationToken ct)
 {
   var runDirectory = Path.Combine(
-      ResultWriter.GetProfileOutputDirectory(config.OutputDirectory, config.Profiles),
+      ResultWriter.GetProfileOutputDirectory(config.OutputDirectory, config.Profiles, config.Parallelism),
       ".runs",
       DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
   Directory.CreateDirectory(runDirectory);
@@ -414,6 +422,7 @@ static BenchmarkWorkloadConfig CreateWorkloadConfig(BenchmarkConfig config)
 {
   return new BenchmarkWorkloadConfig(
       config.Profiles,
+      config.Parallelism,
       config.ReadCount,
       config.EmailReadCount,
       config.QueryCount,

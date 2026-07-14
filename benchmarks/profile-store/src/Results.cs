@@ -13,6 +13,7 @@ public sealed record PhaseResult(
 
 public sealed record BenchmarkWorkloadConfig(
     int Profiles,
+    int Parallelism,
     int ReadCount,
     int EmailReadCount,
     int QueryCount,
@@ -54,7 +55,10 @@ public static class ResultWriter
       string outputDirectory,
       CancellationToken ct)
   {
-    outputDirectory = GetProfileOutputDirectory(outputDirectory, results[0].Workload.Profiles);
+    outputDirectory = GetProfileOutputDirectory(
+        outputDirectory,
+        results[0].Workload.Profiles,
+        results[0].Workload.Parallelism);
     Directory.CreateDirectory(outputDirectory);
     var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
     var jsonPath = Path.Combine(outputDirectory, $"profile-store-{stamp}.json");
@@ -71,8 +75,16 @@ public static class ResultWriter
       Console.WriteLine($"Wrote {Path.Combine(outputDirectory, chart.FileName)}");
   }
 
-  public static string GetProfileOutputDirectory(string outputDirectory, int profiles) =>
-      Path.Combine(outputDirectory, $"profiles-{profiles.ToString(CultureInfo.InvariantCulture)}");
+  public static string GetProfileOutputDirectory(
+      string outputDirectory,
+      int profiles,
+      int parallelism = 1)
+  {
+    var directory = $"profiles-{profiles.ToString(CultureInfo.InvariantCulture)}";
+    if (parallelism > 1)
+      directory += $"-p{parallelism.ToString(CultureInfo.InvariantCulture)}";
+    return Path.Combine(outputDirectory, directory);
+  }
 
   public static Task WriteMarkdownAsync(
       IReadOnlyList<BenchmarkResult> results,
@@ -87,7 +99,7 @@ public static class ResultWriter
   {
     var first = results[0];
     var writer = new StringWriter();
-    writer.WriteLine($"# Benchmark {FormatProfileCount(first.Workload.Profiles)} Profiles{FormatTitleOsSuffix(results)}");
+    writer.WriteLine($"# Benchmark {FormatProfileCount(first.Workload.Profiles)} Profiles{FormatParallelismTitle(GetParallelism(first.Workload))}{FormatTitleOsSuffix(results)}");
     writer.WriteLine();
     writer.WriteLine("## Charts");
     writer.WriteLine();
@@ -140,6 +152,7 @@ public static class ResultWriter
     writer.WriteLine("## Configuration");
     writer.WriteLine();
     writer.WriteLine($"* Profiles: {FormatInteger(first.Workload.Profiles)}");
+    writer.WriteLine($"* Parallelism: {FormatInteger(GetParallelism(first.Workload))}");
     writer.WriteLine("* Profile writes: individual operations");
     writer.WriteLine($"* UserId reads: {FormatInteger(first.Workload.ReadCount)}");
     writer.WriteLine($"* Email lookups: {FormatInteger(first.Workload.EmailReadCount)}");
@@ -327,6 +340,12 @@ public static class ResultWriter
       return $"{value / 1_000}K";
     return FormatInteger(value);
   }
+
+  static string FormatParallelismTitle(int value) =>
+      value > 1 ? $" / P{value.ToString(CultureInfo.InvariantCulture)}" : "";
+
+  static int GetParallelism(BenchmarkWorkloadConfig workload) =>
+      workload.Parallelism <= 0 ? 1 : workload.Parallelism;
 
   static string FormatTitleOsSuffix(IReadOnlyList<BenchmarkResult> results)
   {

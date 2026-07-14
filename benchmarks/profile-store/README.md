@@ -1,198 +1,174 @@
 # Profile Store Benchmark
 
-This benchmark compares ZoneTree, RocksDB, SQLite, and MySQL on a realistic profile-store workload:
+This project compares ZoneTree, RocksDB, SQLite, and MySQL using the same
+application-level profile store. It exercises primary-key access,
+application-managed or native secondary indexes, ordered scans, profile-fetching
+queries, updates, persistence, reopen, and verification.
 
-* insert profile records,
-* maintain secondary indexes,
-* query by primary key,
-* query by indexed fields,
-* scan ordered index ranges,
-* update profile fields,
-* verify deterministic checksums,
-* report final storage size.
+This is not a universal database ranking. It is a reproducible workload for a
+local or service-side profile store with individual writes, multiple secondary
+indexes, and mixed read patterns.
 
-The goal is not to prove that one database is universally faster. The goal is to show the tradeoffs for a local/service-side profile database with high write volume, secondary indexes, and ordered scans.
+## Benchmark Policy
 
-## Run With Docker
+### Managed code compilation
 
-From this directory:
+Reference performance runs should disable .NET tiered compilation:
+
+```powershell
+$env:DOTNET_TieredCompilation = "0"
+```
+
+```cmd
+set DOTNET_TieredCompilation=0
+```
 
 ```bash
-docker compose up --build
+export DOTNET_TieredCompilation=0
 ```
 
-The bundled Docker MySQL service uses `mysql:9.7.1` with benchmark-oriented
-InnoDB settings: binary logging disabled, `innodb_flush_log_at_trx_commit=2`,
-`sync_binlog=0`, 8 GB buffer pool, and 4 GB redo capacity.
+This setting does **not** bypass JIT compilation and does not precompile or warm
+up the benchmark. It disables the tiered JIT pipeline. With the default runtime
+behavior, methods can begin as quickly generated Tier 0 code and later be
+recompiled as optimized Tier 1 code. With tiered compilation disabled, methods
+that require JIT compilation are optimized on their first compilation.
 
-Or override the workload:
+The distinction matters here because ZoneTree is managed code, while most of
+RocksDB's work executes in an already-compiled native library. This benchmark
+starts a fresh process for each engine and does not perform an unmeasured warmup
+for every phase. Tier 0 execution and background tier transitions can therefore
+affect ZoneTree much more than RocksDB.
 
-```bash
-docker compose run --rm benchmark \
-  --engine all \
-  --seed 20260706 \
-  --clean \
-  --output /workspace/benchmarks/profile-store/results \
-  --profiles 100K,1M
-```
+Disabling tiered compilation makes the reference runs steady-state-oriented and
+reduces tier-up variability. It also changes the runtime behavior being
+measured. Do not compare results produced with different tiered-compilation
+settings. The benchmark still includes first-use JIT compilation that occurs
+inside a measured phase.
 
-Results are written to:
+See the [.NET compilation configuration documentation](https://learn.microsoft.com/dotnet/core/runtime-config/compilation)
+for the runtime's tiered compilation, quick JIT, and dynamic PGO behavior.
 
-```text
-benchmarks/profile-store/results/profiles-<count>/
-```
+Server GC is enabled by the benchmark project for every engine.
 
-`--profiles` accepts one count or a comma-separated list. `K` and `M` suffixes
-are supported, for example `--profiles 10000,100K,500K,1M,2M,10M`.
+## Quick Start
 
-## Run Locally
-
-For a Linux host setup without Docker, see
-[bare-metal-server-setup.md](bare-metal-server-setup.md).
-
-Start MySQL separately if you want to include it. A ready-to-paste Docker setup
-is available in [mysql-benchmark-tuning.md](mysql-benchmark-tuning.md). Then run:
-
-```bash
-dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- \
-  --engine all \
-  --clean \
-  --output ./results \
-  --mysql-host YOUR_VM_PUBLIC_IP \
-  --mysql-port 3306 \
-  --mysql-user root \
-  --mysql-password "DevMySql_123456!" \
-  --mysql-database profilebench \
-  --profiles 100K,1M
-```
-
-You can omit the MySQL arguments when the matching `MYSQL_HOST`,
-`MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER`, and `MYSQL_PASSWORD`
-environment variables are already set.
-
-For embedded engines only:
-
-```bash
-dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --engine zonetree,rocksdb,sqlite
-```
-
-## Workload
-
-Multi-engine runs start a separate benchmark process for each engine and then
-aggregate the child results into one report. Each engine run resets its own data
-store before measuring.
-
-Default workload counts:
-
-| Setting | Value |
-| --- | ---: |
-| Profiles | 100,000 |
-| Profile writes | individual operations |
-| UserId reads | profiles |
-| Email lookups | profiles |
-| Country/status index scans | query count |
-| Country/status profile queries | query count |
-| Created-at index scans | query count |
-| Created-at profile queries | query count |
-| Top reputation index scans | query count |
-| Top reputation profile queries | query count |
-| Profile updates | profiles |
-| Post-update UserId reads | profiles |
-| Post-update email lookups | profiles |
-| Post-update country/status index scans | post-query count |
-| Post-update country/status profile queries | post-query count |
-| Post-update top reputation index scans | post-query count |
-| Post-update top reputation profile queries | post-query count |
-| Query limit | 100 |
-
-By default, `query count` and `post-query count` are equal to `profiles` for
-runs up to 10,000 profiles. Above 10,000 profiles, both default to
-`profiles / 4` to keep larger reference runs practical. Override them with
-`--query-count` and `--post-query-count` when you need a shorter smoke run or a
-heavier query-focused run.
-
-The measured phase order is:
-
-1. Insert profiles.
-2. Stabilize for read measurements when the engine requires it.
-3. Read by user id.
-4. Lookup by email.
-5. Scan and query country/status.
-6. Scan and query created-at ranges.
-7. Scan and query top reputation.
-8. Update profiles.
-9. Stabilize again when the engine requires it.
-10. Post-update read by user id.
-11. Post-update lookup by email.
-12. Post-update scan and query country/status.
-13. Post-update scan and query top reputation.
-14. Settle/checkpoint, reopen, and verify.
-
-## Cleanup
-
-Use `--clean` to delete the configured data and results directories before the
-run:
-
-```bash
-dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --engine zonetree,rocksdb,sqlite --clean
-```
-
-Use `--clean-data` or `--clean-results` when you only want one side removed.
-
-## Timeout
-
-Use `--timeout-seconds` to limit each engine run. If an engine times out, the
-benchmark writes a partial report with completed phases, marks that engine as
-timed out, compares checksums across completed engines only, and continues with
-the next requested engine.
-
-```bash
-dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --engine all --timeout-seconds 900 --clean --profiles 10M
-```
-
-Use smaller smoke settings during development:
+Run the embedded engines from this directory:
 
 ```bash
 dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- \
   --engine zonetree,rocksdb,sqlite \
-  --read-count 2000 \
-  --email-read-count 2000 \
-  --query-count 100 \
-  --update-count 1000 \
-  --post-read-count 2000 \
-  --post-email-read-count 2000 \
-  --post-query-count 100 \
-  --profiles 10000
+  --profiles 100K \
+  --parallelism 1,16 \
+  --clean
 ```
 
-## Optional .NET GC Memory Tuning
+`--profiles` accepts one value or a comma-separated list. `K` and `M` suffixes
+are supported. `--parallelism` also accepts one value or a comma-separated
+list.
 
-.NET GC behavior can be adjusted with environment variables. These settings are
-optional and should be reported with the benchmark result when used, because
-they can change both memory usage and throughput.
+For a Linux host without Docker, see
+[bare-metal-server-setup.md](bare-metal-server-setup.md).
+
+### Run all engines with Docker
+
+Build the benchmark image and start the configured MySQL service:
 
 ```bash
-DOTNET_GCConserveMemory=1
-DOTNET_GCHighMemPercent=0x50
+docker compose build benchmark
+docker compose up -d mysql
 ```
 
-`DOTNET_GCConserveMemory` accepts values from `0` to `9`.
-`0` is the default and means no extra memory conservation. Higher values make
-the GC try harder to keep the managed heap smaller, usually by doing more GC
-work. This can reduce reported process peak memory, but may slow the benchmark.
+Run the benchmark with tiered compilation disabled inside the container:
 
-`DOTNET_GCHighMemPercent` sets the physical-memory usage percentage where the
-GC starts treating the machine as under high memory load. Environment variable
-values are hexadecimal, so `0x50` means `80%`, `0x5A` means `90%`, and `0x4B`
-means `75%`. Lower values make the GC react earlier.
+```bash
+docker compose run --rm \
+  -e DOTNET_TieredCompilation=0 \
+  benchmark \
+  --engine all \
+  --profiles 100K,1M \
+  --parallelism 1,16 \
+  --output /workspace/benchmarks/profile-store/results \
+  --data /workspace/benchmarks/profile-store/data
+```
 
-These are runtime-level controls, not the first ZoneTree tuning knobs. For
-application memory tuning, prefer ZoneTree storage and cache options first, such
-as sparse-array step size, block cache behavior, block size, and cache sizes.
+The engine stores are reset before measurement. To remove old Docker reports as
+well, clear the host `results/` directory before starting the container; do not
+ask the benchmark to delete the bind-mount root itself.
+
+The bundled service uses `mysql:9.7.1` with binary logging disabled,
+`innodb_flush_log_at_trx_commit=2`, `sync_binlog=0`, an 8 GB buffer pool, and
+4 GB redo capacity. These are benchmark settings, not production guidance.
+
+For a separately managed MySQL server, configure `MYSQL_HOST`, `MYSQL_PORT`,
+`MYSQL_DATABASE`, `MYSQL_USER`, and `MYSQL_PASSWORD`, or pass the corresponding
+`--mysql-*` arguments. See
+[mysql-benchmark-tuning.md](mysql-benchmark-tuning.md) for a ready-to-run server
+configuration.
+
+## Workload
+
+Multi-engine runs launch each engine in a separate child process and aggregate
+the results afterward. Every engine starts from an empty store. Phases remain
+sequential; only the operations inside a phase are concurrent.
+
+### Default size
+
+| Setting | Default |
+| --- | ---: |
+| Profiles | 100,000 |
+| Parallelism | 1 |
+| Primary-key reads | profiles |
+| Email lookups | profiles |
+| Profile updates | profiles |
+| Post-update primary-key reads | profiles |
+| Post-update email lookups | profiles |
+| Query count, up to 10,000 profiles | profiles |
+| Query count, above 10,000 profiles | profiles / 4 |
+| Post-update query count | same rule as query count |
+| Results returned per query | 50 |
+
+The query limit is intentionally capped at 50 so profile-fetching queries do
+not dominate total runtime. Use `--query-limit`, `--query-count`, and
+`--post-query-count` for query-focused or shorter runs.
+
+### Measured phases
+
+1. Insert profiles.
+2. Stabilize engines that require read stabilization.
+3. Read profiles by user id.
+4. Look up profiles by email.
+5. Scan and query the country/status index.
+6. Scan and query created-at ranges.
+7. Scan and query the top-reputation index.
+8. Update profiles.
+9. Stabilize again when required.
+10. Repeat primary-key, email, country/status, and top-reputation reads.
+11. Settle or checkpoint, close, reopen, and verify persisted data.
+
+The insert and update timings contain only the write phases. Stabilization is
+reported separately and is also combined with write time in the stabilized
+write-throughput chart.
+
+### Parallel execution
+
+With `--parallelism N`, each measured phase uses `N` workers. All workers reach
+a common start gate before the phase stopwatch begins, then they are released
+together. Worker creation and initial scheduling are outside the measured
+interval.
+
+SQLite and MySQL use one connection and one prepared-command set per worker.
+ZoneTree and RocksDB workers share their engine's opened storage handles.
+Repeated updates for the same user id are assigned to the same worker so their
+original order is preserved.
+
+Each phase calculates a checksum. Multi-engine runs compare checksums between
+engines using the same profile count, seed, and parallelism. Final verification
+also checks the reopened store. Checksums from different parallelism levels are
+not expected to be identical because phase results are partitioned by worker.
 
 ## Data Model
 
-Each engine stores:
+Each engine stores this logical record:
 
 ```csharp
 UserProfile(
@@ -207,37 +183,103 @@ UserProfile(
     Bio)
 ```
 
-Secondary indexes:
+The workload maintains these indexes:
 
-* email -> user id,
-* country + status + user id,
-* created-at + user id,
-* reputation descending + user id.
+* email -> user id
+* country + status + user id
+* created-at + user id
+* reputation descending + user id
 
-SQLite and MySQL use native SQL indexes. RocksDB uses separate databases for profile and index data. ZoneTree uses application-managed secondary index trees.
+SQLite and MySQL use native SQL indexes. RocksDB uses separate databases for
+profile and index records. ZoneTree uses separate application-managed trees.
 
-## Fairness Notes
+## Engine Configuration
 
-* MySQL is a server-database baseline, not an embedded peer.
-* MySQL process peak memory covers this benchmark's .NET client process only;
-  the MySQL server/container is outside this measurement.
-* RocksDB is embedded, uses Zstd compression, and uses separate databases/writes for profile and index data to mirror ZoneTree's tree layout.
-* SQLite is embedded and maintains indexes internally.
-* SQLite uses WAL, `synchronous=NORMAL`, a 1 GB page cache, 1 GB memory-mapped I/O allowance, and memory temp storage by default.
-* ZoneTree secondary indexes are application-managed in this benchmark.
-* ZoneTree uses live background maintainers during the workload.
-* ZoneTree maintainer block cache lifetime is 1 minute by default and can be changed with `--zonetree-block-cache-lifetime-minutes`.
-* ZoneTree and RocksDB are stabilized after insert and update phases before measuring read/query phases, so background compaction work does not distort lookup and query throughput.
-* Durability settings are printed in the report. They are similar enough for a practical comparison, but not identical.
-* Results depend on storage, Docker overhead, CPU, memory, and durability mode.
-* Every phase contributes to deterministic checksums so incorrect implementations cannot win by skipping work.
+The report records the effective engine settings. Important defaults are:
+
+| Engine | Configuration |
+| --- | --- |
+| ZoneTree | Async-compressed WAL, live background maintainers, 250,000 mutable-segment items, sparse step 16, key/value caches 1,024, iterator prefetch 16 |
+| RocksDB | WAL enabled, Zstd compression, five database instances, 1,024 MB write buffer per database, four write buffers, unsynchronized writes |
+| SQLite | WAL, `synchronous=NORMAL`, 1,024 MB page cache, 1,024 MB mmap allowance, memory temp storage, autocommit writes |
+| MySQL | InnoDB, native indexes, autocommit writes; bundled Docker durability settings described above |
+
+ZoneTree and RocksDB are stabilized after insert and update phases before read
+and query measurements. ZoneTree settles active data and waits for maintenance;
+RocksDB compacts its databases. SQLite and MySQL do not perform an equivalent
+explicit stabilization phase.
+
+Durability modes are practical comparison points, not identical guarantees.
+MySQL is a server baseline rather than an embedded peer. Its server process and
+container memory are not included in the benchmark client's peak working-set
+measurement.
+
+Results remain sensitive to CPU topology, storage, available memory, operating
+system, runtime configuration, Docker overhead, and background activity. Use
+clean runs on the same documented machine for performance comparisons.
+
+## Important Options
+
+Run `dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --help`
+for the complete option list.
+
+| Option | Purpose |
+| --- | --- |
+| `--engine` | One engine, `all`, or a comma-separated engine list |
+| `--profiles` | One profile count or a comma-separated list |
+| `--parallelism` | One worker count or a comma-separated list |
+| `--query-limit` | Maximum results returned by each index query |
+| `--read-count`, `--email-read-count` | Override pre-update lookup counts |
+| `--query-count`, `--post-query-count` | Override query operation counts |
+| `--update-count` | Override update operations |
+| `--post-read-count`, `--post-email-read-count` | Override post-update lookup counts |
+| `--seed` | Select the deterministic workload |
+| `--timeout-seconds` | Limit each engine child process |
+| `--data`, `--output` | Select data and result roots |
+| `--clean` | Delete both configured roots before the run |
+| `--clean-data`, `--clean-results` | Delete only one configured root |
+| `--update-latest` | Publish generated reports under `reference/<os>/` |
+
+Engine-specific cache, sparse-array, mutable-segment, prefetch, SQLite, and
+RocksDB write-buffer options are listed by `--help` and recorded in JSON and
+Markdown reports.
+
+## Smoke Runs and Timeouts
+
+Use smaller operation counts while changing benchmark code:
+
+```bash
+dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- \
+  --engine zonetree,rocksdb,sqlite \
+  --profiles 10K \
+  --parallelism 1,16 \
+  --read-count 2000 \
+  --email-read-count 2000 \
+  --query-count 100 \
+  --update-count 1000 \
+  --post-read-count 2000 \
+  --post-email-read-count 2000 \
+  --post-query-count 100 \
+  --clean
+```
+
+`--timeout-seconds` limits each engine run. A timeout produces a partial result
+containing completed phases, marks the interrupted phase, and continues with
+the next requested engine.
 
 ## Output
 
-The benchmark writes both JSON and Markdown reports:
+P1 results preserve the original directory name. Higher parallelism levels add
+a suffix:
 
 ```text
-profiles-<count>/
+results/profiles-1000000/
+results/profiles-1000000-p16/
+```
+
+Each directory contains:
+
+```text
 profile-store-YYYYMMDD-HHMMSS.json
 profile-store-YYYYMMDD-HHMMSS.md
 profile-store-YYYYMMDD-HHMMSS-execution-time.svg
@@ -248,68 +290,84 @@ profile-store-YYYYMMDD-HHMMSS-query-throughput.svg
 profile-store-YYYYMMDD-HHMMSS-resources.svg
 ```
 
-Multi-engine child process results are kept under the same profile-count folder
-in `.runs/`.
+Multi-engine child results are retained below `.runs/`. The Markdown report
+contains workload and engine settings, environment details, phase timings,
+throughput, stabilization time, settle time, reopen verification, storage size,
+process peak memory, checksums, and charts.
 
-The Markdown report includes environment information, configuration, durability settings, SVG charts, phase timings, throughput, read-stabilization time, final settle/checkpoint time, reopen time, verify time, storage size, process peak memory, and checksum status.
+Generated files under `results/` are local artifacts. Commit only curated
+reference results under:
 
-The write throughput chart shows both raw write phases and derived stabilized
-write-readiness bars:
-
-* `insert` uses only the measured insert phase.
-* `insert + stabilize` adds the following pre-read stabilization time.
-* `update` uses only the measured update phase.
-* `update + stabilize` adds the following post-update stabilization time.
-
-This keeps raw write throughput visible while also showing when the engine is
-settled for the next read/query phase.
-
-Generated reports under `results/` are local artifacts. Commit only curated
-reference results under `reference/<os>/profiles-<count>/`, after a clean run
-on a documented machine.
-
-To regenerate SVG charts for an existing JSON report without rerunning the
-benchmark:
-
-```bash
-dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --render-charts results/profiles-10000/profile-store-YYYYMMDD-HHMMSS.json
+```text
+reference/<os>/profiles-<count>/
+reference/<os>/profiles-<count>-p<parallelism>/
 ```
 
-To regenerate only the Markdown report from an existing JSON file without
-rewriting the JSON or SVG files:
+### Regenerate reports
+
+Regenerate charts for one JSON report:
 
 ```bash
-dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --render-markdown results/profiles-10000/profile-store-YYYYMMDD-HHMMSS.json
+dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- \
+  --render-charts results/profiles-10000/profile-store-YYYYMMDD-HHMMSS.json
 ```
 
-To regenerate every committed reference report from existing `latest.json`
-files without rerunning benchmarks:
+Regenerate only its Markdown report:
 
 ```bash
-dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --render-reference-reports
+dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- \
+  --render-markdown results/profiles-10000/profile-store-YYYYMMDD-HHMMSS.json
 ```
 
-You can also pass a specific reference directory:
+Regenerate every committed reference report from existing `latest.json` files:
 
 ```bash
-dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --render-reference-reports reference/linux
+dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- \
+  --render-reference-reports
 ```
 
-To publish the current run as the committed latest reference:
+An optional reference directory can follow `--render-reference-reports`.
+
+### Publish reference results
+
+Configure MySQL through environment variables, disable tiered compilation, and
+run from a quiet machine:
 
 ```bash
-#windows
-dotnet run --project src\ProfileStore.Benchmark.csproj -c Release -- --mysql-host 192.168.178.25 --mysql-port 3306 --mysql-user root --mysql-password "DevMySql_123456!" --mysql-database profilebench --output results --data data --update-latest --timeout-seconds 120000 --engine all --profiles 100K,500K,1M,2M,5M,10M
+export DOTNET_TieredCompilation=0
+export MYSQL_HOST=127.0.0.1
+export MYSQL_PORT=3306
+export MYSQL_DATABASE=profilebench
+export MYSQL_USER=root
+export MYSQL_PASSWORD=your-password
 
-#linux
-nohup dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --mysql-host 127.0.0.1 --mysql-port 3306 --mysql-user root --mysql-password "DevMySql_123456!" --mysql-database profilebench --output results --data data --update-latest --timeout-seconds 120000 --engine all --profiles 100K,500K,1M,2M
-
-nohup dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --mysql-host 127.0.0.1 --mysql-port 3306 --mysql-user root --mysql-password "DevMySql_123456!" --mysql-database profilebench --output results --data data --update-latest --timeout-seconds 120000 --engine all --profiles 5M,10M,50M
-
-nohup dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- --mysql-host 127.0.0.1 --mysql-port 3306 --mysql-user root --mysql-password "DevMySql_123456!" --mysql-database profilebench --output results --data data --update-latest --timeout-seconds 120000 --engine all --profiles 100M --zonetree-sparse-array-step-size 32
+dotnet run --project src/ProfileStore.Benchmark.csproj -c Release -- \
+  --engine all \
+  --profiles 100K,500K,1M,2M \
+  --parallelism 1,16 \
+  --timeout-seconds 120000 \
+  --output results \
+  --data data \
+  --update-latest
 ```
 
-This updates `reference/<os>/profiles-<count>/latest.md` and the matching
-`latest.json` and `latest-*.svg` files for each requested profile count. The
-`<os>` directory is selected from the current operating system, such as `win`
-or `linux`.
+`--update-latest` writes `latest.json`, `latest.md`, and matching SVG files to
+the current platform directory, such as `reference/win/` or `reference/linux/`.
+
+## Optional GC Memory Tuning
+
+The project uses Server GC. Additional runtime controls can change both memory
+usage and throughput and must remain consistent across compared runs:
+
+```bash
+export DOTNET_GCConserveMemory=1
+export DOTNET_GCHighMemPercent=0x50
+```
+
+`DOTNET_GCConserveMemory` ranges from `0` to `9`; higher values ask the GC to
+work harder to reduce managed-heap size. `DOTNET_GCHighMemPercent` controls the
+physical-memory percentage at which the GC treats the machine as under high
+memory load. Environment variable values are hexadecimal, so `0x50` means 80%.
+
+These are runtime-wide controls. Prefer ZoneTree's storage, block cache,
+sparse-array, and cache-size options when tuning ZoneTree itself.

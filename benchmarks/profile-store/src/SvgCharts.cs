@@ -117,17 +117,17 @@ public static class BenchmarkChartWriter
       (artifacts[2], CreatePhaseThroughput(
           results,
           "Lookup Throughput",
-          "Grouped bars show relative throughput for point and email lookups; tallest bar per phase is 100%",
+          $"Grouped bars show relative throughput for point and email lookups{FormatParallelism(results)}; tallest bar per phase is 100%",
           ["read by user id", "lookup by email", "post-update read by user id", "post-update lookup by email"])),
       (artifacts[3], CreatePhaseThroughput(
           results,
           "Index Scan Throughput",
-          "Grouped bars show relative throughput for index-only scans; tallest bar per phase is 100%",
+          $"Grouped bars show relative throughput for index-only scans{FormatParallelism(results)}; tallest bar per phase is 100%",
           ["scan country/status index", "scan created-at index", "scan top reputation index", "post-update scan country/status index", "post-update scan top reputation index"])),
       (artifacts[4], CreatePhaseThroughput(
           results,
           "Query Throughput",
-          "Grouped bars show relative throughput for indexed queries that fetch profiles; tallest bar per phase is 100%",
+          $"Grouped bars show relative throughput for indexed queries that fetch profiles{FormatParallelism(results)}; tallest bar per phase is 100%",
           ["query country/status", "query created-at range", "query top reputation", "post-update query country/status", "post-update query top reputation"])),
       (artifacts[5], CreateResources(results))
     };
@@ -163,7 +163,7 @@ public static class BenchmarkChartWriter
         1360,
         174 + complete.Length * 62,
         "Profile Store Execution Time",
-        $"{FormatCount(results[0].Workload.Profiles)} live profiles; completed phase time normalized to the fastest engine");
+        $"{FormatCount(results[0].Workload.Profiles)} live profiles{FormatParallelism(results)}; completed phase time normalized to the fastest engine");
 
     const double headerY = SvgChartBuilder.ContentTop;
     const double firstRowY = headerY + 34;
@@ -216,7 +216,7 @@ public static class BenchmarkChartWriter
           return (result.Engine, Points: (IReadOnlyList<ThroughputDataPoint>)points);
         }).ToArray(),
         "Write Throughput",
-        "Raw write throughput and throughput after the following stabilization phase; tallest bar per group is 100%",
+        $"Raw write throughput{FormatParallelism(results)} and throughput after the following stabilization phase; tallest bar per group is 100%",
         ["insert", "insert + stabilize", "update", "update + stabilize"]);
   }
 
@@ -330,7 +330,7 @@ public static class BenchmarkChartWriter
 
   static string CreateResources(IReadOnlyList<BenchmarkResult> results)
   {
-    var chart = new SvgChartBuilder(1360, 462, "Resource Footprint", "Lower is better for both dimensions");
+    var chart = new SvgChartBuilder(1360, 462, "Resource Footprint", $"Lower is better for both dimensions{FormatParallelism(results)}");
     DrawResourceBars(
         chart,
         "Storage",
@@ -412,6 +412,14 @@ public static class BenchmarkChartWriter
 
   static string FormatCount(long value) =>
       value.ToString("N0", CultureInfo.InvariantCulture).Replace(",", "_");
+
+  static string FormatParallelism(IReadOnlyList<BenchmarkResult> results)
+  {
+    var parallelism = results[0].Workload.Parallelism;
+    if (parallelism <= 0)
+      parallelism = 1;
+    return parallelism > 1 ? $" at P{parallelism.ToString(CultureInfo.InvariantCulture)}" : "";
+  }
 
   sealed record ThroughputDataPoint(string Name, double OperationsPerSecond);
 }

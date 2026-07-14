@@ -2,7 +2,7 @@ using Microsoft.Data.Sqlite;
 
 namespace ProfileStore.Benchmark;
 
-public sealed class SqliteProfileStore : IProfileStoreEngine
+public sealed class SqliteProfileStore : IProfileStoreEngine, IProfileStoreEngineWorker
 {
   string DatabasePath = "";
   SqliteConnection? Connection;
@@ -39,6 +39,7 @@ public sealed class SqliteProfileStore : IProfileStoreEngine
     await Connection.OpenAsync(ct);
     await ExecuteAsync("PRAGMA journal_mode=WAL;", ct);
     await ExecuteAsync("PRAGMA synchronous=NORMAL;", ct);
+    await ExecuteAsync("PRAGMA busy_timeout=60000;", ct);
     CacheMb = config.SqliteCacheMb;
     MmapMb = config.SqliteMmapMb;
     if (CacheMb > 0)
@@ -47,6 +48,35 @@ public sealed class SqliteProfileStore : IProfileStoreEngine
       await ExecuteAsync($"PRAGMA mmap_size={MmapMb * 1024L * 1024L};", ct);
     await ExecuteAsync("PRAGMA temp_store=MEMORY;", ct);
     await CreateSchemaAsync(ct);
+    PrepareCommands();
+  }
+
+  public async Task<IProfileStoreEngineWorker> CreateWorkerAsync(CancellationToken ct)
+  {
+    var worker = new SqliteProfileStore();
+    await worker.InitializeWorkerAsync(DatabasePath, CacheMb, MmapMb, ct);
+    return worker;
+  }
+
+  async Task InitializeWorkerAsync(
+      string databasePath,
+      int cacheMb,
+      int mmapMb,
+      CancellationToken ct)
+  {
+    DatabasePath = databasePath;
+    CacheMb = cacheMb;
+    MmapMb = mmapMb;
+    Connection = new SqliteConnection($"Data Source={DatabasePath}");
+    await Connection.OpenAsync(ct);
+    await ExecuteAsync("PRAGMA journal_mode=WAL;", ct);
+    await ExecuteAsync("PRAGMA synchronous=NORMAL;", ct);
+    await ExecuteAsync("PRAGMA busy_timeout=60000;", ct);
+    if (CacheMb > 0)
+      await ExecuteAsync($"PRAGMA cache_size=-{CacheMb * 1024L};", ct);
+    if (MmapMb > 0)
+      await ExecuteAsync($"PRAGMA mmap_size={MmapMb * 1024L * 1024L};", ct);
+    await ExecuteAsync("PRAGMA temp_store=MEMORY;", ct);
     PrepareCommands();
   }
 

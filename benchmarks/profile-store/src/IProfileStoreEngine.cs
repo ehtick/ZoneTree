@@ -10,6 +10,19 @@ public interface IProfileStoreEngine : IAsyncDisposable
 
   Task InitializeAsync(BenchmarkConfig config, bool reset, CancellationToken ct);
 
+  Task<IProfileStoreEngineWorker> CreateWorkerAsync(CancellationToken ct);
+
+  Task StabilizeForReadMeasurementsAsync(CancellationToken ct);
+
+  Task SettleAsync(CancellationToken ct);
+
+  Task<long> CountProfilesAsync(CancellationToken ct);
+
+  Task<long> GetStorageSizeBytesAsync(CancellationToken ct);
+}
+
+public interface IProfileStoreEngineWorker : IAsyncDisposable
+{
   Task InsertBatchAsync(IReadOnlyList<UserProfile> profiles, CancellationToken ct);
 
   Task<UserProfile?> GetByUserIdAsync(long userId, CancellationToken ct);
@@ -49,12 +62,4 @@ public interface IProfileStoreEngine : IAsyncDisposable
       CancellationToken ct);
 
   Task UpdateBatchAsync(IReadOnlyList<UserProfile> profiles, CancellationToken ct);
-
-  Task StabilizeForReadMeasurementsAsync(CancellationToken ct);
-
-  Task SettleAsync(CancellationToken ct);
-
-  Task<long> CountProfilesAsync(CancellationToken ct);
-
-  Task<long> GetStorageSizeBytesAsync(CancellationToken ct);
 }

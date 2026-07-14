@@ -7,7 +7,7 @@ using ZoneTree.Serializers;
 
 namespace ProfileStore.Benchmark;
 
-public sealed class ZoneTreeProfileStore : IProfileStoreEngine
+public sealed class ZoneTreeProfileStore : IProfileStoreEngine, IProfileStoreEngineWorker
 {
   string RootDirectory = "";
   IZoneTree<long, string>? Profiles;
@@ -58,6 +58,9 @@ public sealed class ZoneTreeProfileStore : IProfileStoreEngine
     AddMaintainer(ReputationIndex);
     return Task.CompletedTask;
   }
+
+  public Task<IProfileStoreEngineWorker> CreateWorkerAsync(CancellationToken ct) =>
+      Task.FromResult<IProfileStoreEngineWorker>(new Worker(this));
 
   public Task InsertBatchAsync(IReadOnlyList<UserProfile> profiles, CancellationToken ct)
   {
@@ -359,5 +362,56 @@ public sealed class ZoneTreeProfileStore : IProfileStoreEngine
   {
     return Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories)
         .Sum(file => new FileInfo(file).Length);
+  }
+
+  sealed class Worker(ZoneTreeProfileStore store) : IProfileStoreEngineWorker
+  {
+    public Task InsertBatchAsync(IReadOnlyList<UserProfile> profiles, CancellationToken ct) =>
+        store.InsertBatchAsync(profiles, ct);
+
+    public Task<UserProfile?> GetByUserIdAsync(long userId, CancellationToken ct) =>
+        store.GetByUserIdAsync(userId, ct);
+
+    public Task<UserProfile?> GetByEmailAsync(string email, CancellationToken ct) =>
+        store.GetByEmailAsync(email, ct);
+
+    public Task<IReadOnlyList<UserProfile>> QueryCountryStatusAsync(
+        string country,
+        string status,
+        int limit,
+        CancellationToken ct) =>
+        store.QueryCountryStatusAsync(country, status, limit, ct);
+
+    public Task<IReadOnlyList<long>> ScanCountryStatusIndexAsync(
+        string country,
+        string status,
+        int limit,
+        CancellationToken ct) =>
+        store.ScanCountryStatusIndexAsync(country, status, limit, ct);
+
+    public Task<IReadOnlyList<UserProfile>> QueryCreatedAtRangeAsync(
+        long fromUnixMs,
+        long toUnixMs,
+        int limit,
+        CancellationToken ct) =>
+        store.QueryCreatedAtRangeAsync(fromUnixMs, toUnixMs, limit, ct);
+
+    public Task<IReadOnlyList<long>> ScanCreatedAtRangeIndexAsync(
+        long fromUnixMs,
+        long toUnixMs,
+        int limit,
+        CancellationToken ct) =>
+        store.ScanCreatedAtRangeIndexAsync(fromUnixMs, toUnixMs, limit, ct);
+
+    public Task<IReadOnlyList<UserProfile>> QueryTopReputationAsync(int limit, CancellationToken ct) =>
+        store.QueryTopReputationAsync(limit, ct);
+
+    public Task<IReadOnlyList<long>> ScanTopReputationIndexAsync(int limit, CancellationToken ct) =>
+        store.ScanTopReputationIndexAsync(limit, ct);
+
+    public Task UpdateBatchAsync(IReadOnlyList<UserProfile> profiles, CancellationToken ct) =>
+        store.UpdateBatchAsync(profiles, ct);
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
   }
 }
