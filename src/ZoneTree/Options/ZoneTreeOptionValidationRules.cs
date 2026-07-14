@@ -5,6 +5,9 @@ internal static class ZoneTreeOptionValidationRules
   public static readonly Rule MutableSegmentMaxItemCount =
       Rule.Min(1000);
 
+  public static readonly Rule MutableSegmentBloomFilterBitsPerItem =
+      Rule.Min(0).Max(64);
+
   public static readonly Rule DiskSegmentMaxItemCount =
       Rule.Min(10000);
 

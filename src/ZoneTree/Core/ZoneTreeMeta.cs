@@ -9,6 +9,8 @@ public sealed class ZoneTreeMeta
 
   public string ComparerType { get; set; }
 
+  public string KeyHasherType { get; set; }
+
   public string KeyType { get; set; }
 
   public string ValueType { get; set; }
@@ -18,6 +20,8 @@ public sealed class ZoneTreeMeta
   public string ValueSerializerType { get; set; }
 
   public int MutableSegmentMaxItemCount { get; set; }
+
+  public int MutableSegmentBloomFilterBitsPerItem { get; set; }
 
   public int DiskSegmentMaxItemCount { get; set; } = 20_000_000;
 

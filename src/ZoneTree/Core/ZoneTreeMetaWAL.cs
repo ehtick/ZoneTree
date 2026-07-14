@@ -232,6 +232,7 @@ public sealed class ZoneTreeMetaWAL<TKey, TValue> : IDisposable
       KeyType = zoneTreeMeta.KeyType,
       ValueType = zoneTreeMeta.ValueType,
       ComparerType = zoneTreeMeta.ComparerType,
+      KeyHasherType = Options.KeyHasher?.GetType().SimplifiedFullName(),
       DiskSegment = diskSegment,
       ReadOnlySegments = readOnlySegments,
       MutableSegment = mutableSegment,
@@ -240,6 +241,8 @@ public sealed class ZoneTreeMetaWAL<TKey, TValue> : IDisposable
       WriteAheadLogOptions = Options.WriteAheadLogOptions,
       DiskSegmentOptions = Options.DiskSegmentOptions,
       MutableSegmentMaxItemCount = Options.MutableSegmentMaxItemCount,
+      MutableSegmentBloomFilterBitsPerItem =
+          Options.MutableSegmentBloomFilterBitsPerItem,
       DiskSegmentMaxItemCount = Options.DiskSegmentMaxItemCount,
       BottomSegments = bottomSegments,
       MaximumOpIndex = zoneTreeMeta.MaximumOpIndex,
@@ -276,6 +279,9 @@ public sealed class ZoneTreeMetaWAL<TKey, TValue> : IDisposable
     zoneTreeMeta.WriteAheadLogOptions = Options.WriteAheadLogOptions;
     zoneTreeMeta.DiskSegmentOptions = Options.DiskSegmentOptions;
     zoneTreeMeta.MutableSegmentMaxItemCount = Options.MutableSegmentMaxItemCount;
+    zoneTreeMeta.KeyHasherType = Options.KeyHasher?.GetType().SimplifiedFullName();
+    zoneTreeMeta.MutableSegmentBloomFilterBitsPerItem =
+        Options.MutableSegmentBloomFilterBitsPerItem;
     zoneTreeMeta.DiskSegmentMaxItemCount = Options.DiskSegmentMaxItemCount;
   }
 

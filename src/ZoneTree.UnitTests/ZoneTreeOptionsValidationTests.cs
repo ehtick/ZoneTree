@@ -6,6 +6,7 @@ using ZoneTree.Options;
 using ZoneTree.Segments.RandomAccess;
 using ZoneTree.Serializers;
 using ZoneTree.WAL;
+using ZoneTree.Hashers;
 
 namespace ZoneTree.UnitTests;
 
@@ -69,6 +70,16 @@ public sealed class ZoneTreeOptionsValidationTests
   }
 
   [Test]
+  public void MaximumMutableSegmentBloomFilterBitsPerItemPassesValidation()
+  {
+    var options = CreateValidOptions();
+    options.MutableSegmentBloomFilterBitsPerItem = 64;
+
+    Assert.That(options.TryValidate(out var exception), Is.True);
+    Assert.That(exception, Is.Null);
+  }
+
+  [Test]
   public void AllowUnsafeOptionValuesSkipsNumericRanges()
   {
     var options = CreateValidOptions();
@@ -97,6 +108,33 @@ public sealed class ZoneTreeOptionsValidationTests
     Assert.That(exception, Is.TypeOf<InvalidOptionValueException>());
   }
 
+  [Test]
+  public void CaseInsensitiveComparerRejectsIncompatibleKeyHasher()
+  {
+    var options = CreateValidStringOptions();
+    options.Comparer = new StringOrdinalIgnoreCaseComparerAscending();
+    options.KeyHasher = new DefaultKeyHasher<string>();
+
+    var isValid = options.TryValidate(out var exception);
+
+    Assert.That(isValid, Is.False);
+    Assert.That(exception, Is.TypeOf<InvalidOptionValueException>());
+    Assert.That(
+        ((InvalidOptionValueException)exception).Option,
+        Is.EqualTo(nameof(options.KeyHasher)));
+  }
+
+  [Test]
+  public void CaseInsensitiveComparerAcceptsCompatibleKeyHasher()
+  {
+    var options = CreateValidStringOptions();
+    options.Comparer = new StringOrdinalIgnoreCaseComparerAscending();
+    options.KeyHasher = new OrdinalIgnoreCaseKeyHasher();
+
+    Assert.That(options.TryValidate(out var exception), Is.True);
+    Assert.That(exception, Is.Null);
+  }
+
   static IEnumerable<TestCaseData> MissingOptionCases()
   {
     yield return Missing(
@@ -110,6 +148,10 @@ public sealed class ZoneTreeOptionsValidationTests
     yield return Missing(
         options => options.Comparer = null,
         nameof(ZoneTreeOptions<int, int>.Comparer));
+
+    yield return Missing(
+        options => options.KeyHasher = null,
+        nameof(ZoneTreeOptions<int, int>.KeyHasher));
 
     yield return Missing(
         options => options.IsDeleted = null,
@@ -153,6 +195,14 @@ public sealed class ZoneTreeOptionsValidationTests
     yield return Invalid(
         options => options.MutableSegmentMaxItemCount = 0,
         nameof(ZoneTreeOptions<int, int>.MutableSegmentMaxItemCount));
+
+    yield return Invalid(
+        options => options.MutableSegmentBloomFilterBitsPerItem = -1,
+        nameof(ZoneTreeOptions<int, int>.MutableSegmentBloomFilterBitsPerItem));
+
+    yield return Invalid(
+        options => options.MutableSegmentBloomFilterBitsPerItem = 65,
+        nameof(ZoneTreeOptions<int, int>.MutableSegmentBloomFilterBitsPerItem));
 
     yield return Invalid(
         options => options.DiskSegmentMaxItemCount = 0,
@@ -272,6 +322,7 @@ public sealed class ZoneTreeOptionsValidationTests
     var options = new ZoneTreeOptions<int, int>
     {
       Comparer = new Int32ComparerAscending(),
+      KeyHasher = new DefaultKeyHasher<int>(),
       KeySerializer = new Int32Serializer(),
       ValueSerializer = new Int32Serializer(),
       Logger = logger,
@@ -283,5 +334,33 @@ public sealed class ZoneTreeOptionsValidationTests
     };
     options.DisableDeletion();
     return options;
+  }
+
+  static ZoneTreeOptions<string, string> CreateValidStringOptions()
+  {
+    var logger = new ConsoleLogger(LogLevel.Error);
+    var options = new ZoneTreeOptions<string, string>
+    {
+      Comparer = new StringOrdinalComparerAscending(),
+      KeyHasher = new DefaultKeyHasher<string>(),
+      KeySerializer = new Utf8StringSerializer(),
+      ValueSerializer = new Utf8StringSerializer(),
+      Logger = logger,
+      WriteAheadLogProvider = new NullWriteAheadLogProvider(),
+      RandomAccessDeviceManager = new RandomAccessDeviceManager(
+          logger,
+          new InMemoryFileStreamProvider(),
+          "data/ZoneTreeStringOptionsValidationTests")
+    };
+    options.DisableDeletion();
+    return options;
+  }
+
+  sealed class OrdinalIgnoreCaseKeyHasher : IKeyHasher<string>
+  {
+    public int GetHashCode(in string key)
+    {
+      return StringComparer.OrdinalIgnoreCase.GetHashCode(key);
+    }
   }
 }

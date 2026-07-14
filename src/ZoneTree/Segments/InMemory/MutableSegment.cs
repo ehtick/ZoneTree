@@ -21,6 +21,8 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
 
   readonly BTree<TKey, TValue> BTree;
 
+  readonly ConcurrentBloomFilter<TKey> BloomFilter;
+
   readonly IRefComparer<TKey> Comparer;
 
   readonly IWriteAheadLog<TKey, TValue> WriteAheadLog;
@@ -51,6 +53,8 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
             options.KeySerializer,
             options.ValueSerializer);
     Comparer = options.Comparer;
+    MutableSegmentMaxItemCount = options.MutableSegmentMaxItemCount;
+    BloomFilter = CreateBloomFilter(options);
 
     BTree = new(Comparer,
         Options.BTreeLockMode,
@@ -59,7 +63,6 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
         Options.BTreeLeafSize);
 
     MarkValueDeleted = options.MarkValueDeleted;
-    MutableSegmentMaxItemCount = options.MutableSegmentMaxItemCount;
   }
 
   public MutableSegment(
@@ -75,6 +78,8 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
     WriteAheadLog = wal;
     Options = options;
     Comparer = options.Comparer;
+    MutableSegmentMaxItemCount = options.MutableSegmentMaxItemCount;
+    BloomFilter = CreateBloomFilter(options);
 
     BTree = new(
         Comparer,
@@ -84,7 +89,6 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
         Options.BTreeLeafSize);
 
     MarkValueDeleted = options.MarkValueDeleted;
-    MutableSegmentMaxItemCount = options.MutableSegmentMaxItemCount;
     if (collectGarbage)
     {
       // If there isn't any disk segment and readonly segment,
@@ -108,6 +112,7 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
       var value = values[i];
       // TODO: Search if we can create faster construction
       // of mutable segment from log entries.
+      BloomFilter?.Add(in key);
       BTree.Upsert(in key, in value, out var _);
     }
   }
@@ -131,17 +136,30 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
       {
         continue;
       }
+      BloomFilter?.Add(in key);
       BTree.Upsert(in key, in value, out var _);
     }
   }
 
   public bool ContainsKey(in TKey key)
   {
+    if (BTree.Length == 0)
+      return false;
+    if (BloomFilter != null &&
+        !BloomFilter.MightContain(in key))
+      return false;
     return BTree.ContainsKey(key);
   }
 
   public bool TryGet(in TKey key, out TValue value)
   {
+    if (BTree.Length == 0 ||
+        (BloomFilter != null &&
+         !BloomFilter.MightContain(in key)))
+    {
+      value = default;
+      return false;
+    }
     return BTree.TryGetValue(key, out value);
   }
 
@@ -162,6 +180,7 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
         opIndex = 0;
         return AddOrUpdateResult.RETRY_SEGMENT_IS_FULL;
       }
+      BloomFilter?.Add(in key);
       var result = BTree.Upsert(in key, in value, out opIndex);
       WriteAheadLog.Append(in key, in value, opIndex);
       return result ? AddOrUpdateResult.ADDED : AddOrUpdateResult.UPDATED;
@@ -192,6 +211,7 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
         opIndex = 0;
         return AddOrUpdateResult.RETRY_SEGMENT_IS_FULL;
       }
+      BloomFilter?.Add(in key);
       var result = BTree.Upsert(in key, valueGetter, out var value, out opIndex);
       WriteAheadLog.Append(in key, in value, opIndex);
       return result ? AddOrUpdateResult.ADDED : AddOrUpdateResult.UPDATED;
@@ -222,6 +242,7 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
 
       TValue insertedValue = default;
 
+      BloomFilter?.Add(in key);
       var status = BTree
           .AddOrUpdate(key,
               void (ref TValue x) =>
@@ -247,6 +268,18 @@ public sealed class MutableSegment<TKey, TValue> : IMutableSegment<TKey, TValue>
   {
     IsFrozenFlag = true;
     new Thread(FreezeWriteAheadLog).Start();
+  }
+
+  ConcurrentBloomFilter<TKey> CreateBloomFilter(
+      ZoneTreeOptions<TKey, TValue> options)
+  {
+    var bitsPerItem = options.MutableSegmentBloomFilterBitsPerItem;
+    return bitsPerItem == 0 ?
+        null :
+        new ConcurrentBloomFilter<TKey>(
+            MutableSegmentMaxItemCount,
+            bitsPerItem,
+            options.KeyHasher);
   }
 
   void FreezeWriteAheadLog()

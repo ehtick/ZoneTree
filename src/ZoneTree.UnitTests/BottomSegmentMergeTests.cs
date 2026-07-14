@@ -5,6 +5,7 @@ using ZoneTree.AbstractFileStream;
 using ZoneTree.Comparers;
 using ZoneTree.Core;
 using ZoneTree.Logger;
+using ZoneTree.Hashers;
 using ZoneTree.Options;
 using ZoneTree.Segments;
 using ZoneTree.Segments.Disk;
@@ -322,6 +323,7 @@ public sealed class BottomSegmentMergeTests
     var options = new ZoneTreeOptions<int, int>
     {
       Comparer = new Int32ComparerAscending(),
+      KeyHasher = new DefaultKeyHasher<int>(),
       KeySerializer = new Int32Serializer(),
       ValueSerializer = new Int32Serializer(),
       Logger = logger,
@@ -362,6 +364,7 @@ public sealed class BottomSegmentMergeTests
     var options = new ZoneTreeOptions<int, int>
     {
       Comparer = new Int32ComparerAscending(),
+      KeyHasher = new DefaultKeyHasher<int>(),
       KeySerializer = new Int32Serializer(),
       ValueSerializer = new Int32Serializer(),
       Logger = logger,

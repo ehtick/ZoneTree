@@ -5,6 +5,7 @@ using ZoneTree.Serializers;
 using ZoneTree.Comparers;
 using ZoneTree.Segments.RandomAccess;
 using ZoneTree.PresetTypes;
+using ZoneTree.Hashers;
 
 namespace ZoneTree.Options;
 
@@ -42,6 +43,15 @@ public sealed class ZoneTreeOptions<TKey, TValue>
   public int MutableSegmentMaxItemCount { get; set; } = DefaultValues.MutableSegmentMaxItemCount;
 
   /// <summary>
+  /// Requested Bloom-filter bits per mutable-segment item. Higher values reduce
+  /// false positives but use more memory. The allocation is rounded up to a
+  /// power of two. Setting this value to zero disables the mutable-segment
+  /// Bloom filter. Valid values are between 0 and 64. Default value is 8.
+  /// </summary>
+  public int MutableSegmentBloomFilterBitsPerItem { get; set; } =
+      DefaultValues.MutableSegmentBloomFilterBitsPerItem;
+
+  /// <summary>
   /// Disk segment maximum key-value pair count.
   /// After a merge creates a disk segment, segments larger than this value are
   /// enqueued into the bottom segments layer.
@@ -52,6 +62,12 @@ public sealed class ZoneTreeOptions<TKey, TValue>
   /// The key comparer.
   /// </summary>
   public IRefComparer<TKey> Comparer { get; set; }
+
+  /// <summary>
+  /// The key hasher. Keys considered equal by <see cref="Comparer"/> must
+  /// produce the same hash code.
+  /// </summary>
+  public IKeyHasher<TKey> KeyHasher { get; set; }
 
   /// <summary>
   /// The key serializer.
