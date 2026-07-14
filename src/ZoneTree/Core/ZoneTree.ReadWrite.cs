@@ -1,6 +1,7 @@
 using ZoneTree.Collections;
 using ZoneTree.Collections.BTree;
 using ZoneTree.Exceptions;
+using ZoneTree.Hashers;
 using ZoneTree.Segments;
 
 namespace ZoneTree.Core;
@@ -9,17 +10,21 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
 {
   public bool ContainsKey(in TKey key)
   {
-    if (MutableSegment.TryGet(key, out TValue value))
+    var keyHashProvider = new KeyHashProvider<TKey>();
+    if (MutableSegment.TryGet(key, out TValue value, ref keyHashProvider))
       return !IsDeleted(key, value);
 
-    return TryGetFromReadonlySegments(in key, out _);
+    return TryGetFromReadonlySegments(in key, out _, ref keyHashProvider);
   }
 
-  bool TryGetFromReadonlySegments(in TKey key, out TValue value)
+  bool TryGetFromReadonlySegments(
+      in TKey key,
+      out TValue value,
+      ref KeyHashProvider<TKey> keyHashProvider)
   {
     foreach (var segment in ReadOnlySegmentQueue)
     {
-      if (segment.TryGet(key, out value))
+      if (segment.TryGet(key, out value, ref keyHashProvider))
       {
         return !IsDeleted(key, value);
       }
@@ -29,14 +34,14 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
     {
       try
       {
-        if (DiskSegment.TryGet(key, out value))
+        if (DiskSegment.TryGet(key, out value, ref keyHashProvider))
         {
           return !IsDeleted(key, value);
         }
 
         foreach (var segment in BottomSegmentQueue)
         {
-          if (segment.TryGet(key, out value))
+          if (segment.TryGet(key, out value, ref keyHashProvider))
           {
             return !IsDeleted(key, value);
           }
@@ -52,11 +57,12 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
 
   public bool TryGet(in TKey key, out TValue value)
   {
-    if (MutableSegment.TryGet(key, out value))
+    var keyHashProvider = new KeyHashProvider<TKey>();
+    if (MutableSegment.TryGet(key, out value, ref keyHashProvider))
     {
       return !IsDeleted(key, value);
     }
-    return TryGetFromReadonlySegments(in key, out value);
+    return TryGetFromReadonlySegments(in key, out value, ref keyHashProvider);
   }
 
   public bool TryAdd(in TKey key, in TValue value, out long opIndex)
@@ -79,7 +85,8 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
     if (IsReadOnly)
       throw new ZoneTreeIsReadOnlyException();
 
-    if (MutableSegment.TryGet(key, out value))
+    var keyHashProvider = new KeyHashProvider<TKey>();
+    if (MutableSegment.TryGet(key, out value, ref keyHashProvider))
     {
       if (IsDeleted(key, value))
       {
@@ -87,7 +94,7 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
         return false;
       }
     }
-    else if (!TryGetFromReadonlySegments(in key, out value))
+    else if (!TryGetFromReadonlySegments(in key, out value, ref keyHashProvider))
     {
       opIndex = 0;
       return false;
@@ -114,12 +121,13 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
 
     lock (AtomicUpdateLock)
     {
-      if (MutableSegment.TryGet(key, out value))
+      var keyHashProvider = new KeyHashProvider<TKey>();
+      if (MutableSegment.TryGet(key, out value, ref keyHashProvider))
       {
         if (IsDeleted(key, value))
           return false;
       }
-      else if (!TryGetFromReadonlySegments(in key, out value))
+      else if (!TryGetFromReadonlySegments(in key, out value, ref keyHashProvider))
         return false;
 
       if (!valueUpdater(ref value))
@@ -185,6 +193,7 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
     IMutableSegment<TKey, TValue> mutableSegment;
     var opIndex = 0L;
     result ??= EmptyOperationResultDelegate;
+    var keyHashProvider = new KeyHashProvider<TKey>();
 
     while (true)
     {
@@ -195,7 +204,7 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
         {
           status = AddOrUpdateResult.RETRY_SEGMENT_IS_FULL;
         }
-        else if (mutableSegment.TryGet(in key, out var existing))
+        else if (mutableSegment.TryGet(in key, out var existing, ref keyHashProvider))
         {
           if (!valueUpdater(ref existing))
           {
@@ -209,7 +218,7 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
             return false;
           }
         }
-        else if (TryGetFromReadonlySegments(in key, out existing))
+        else if (TryGetFromReadonlySegments(in key, out existing, ref keyHashProvider))
         {
           if (!valueUpdater(ref existing))
           {
@@ -259,6 +268,7 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
     IMutableSegment<TKey, TValue> mutableSegment;
     var opIndex = 0L;
     result ??= EmptyOperationResultDelegate;
+    var keyHashProvider = new KeyHashProvider<TKey>();
     while (true)
     {
       lock (AtomicUpdateLock)
@@ -268,7 +278,7 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
         {
           status = AddOrUpdateResult.RETRY_SEGMENT_IS_FULL;
         }
-        else if (mutableSegment.TryGet(in key, out var existing))
+        else if (mutableSegment.TryGet(in key, out var existing, ref keyHashProvider))
         {
           if (!valueUpdater(ref existing))
           {
@@ -282,7 +292,7 @@ public sealed partial class ZoneTree<TKey, TValue> : IZoneTree<TKey, TValue>, IZ
             return false;
           }
         }
-        else if (TryGetFromReadonlySegments(in key, out existing))
+        else if (TryGetFromReadonlySegments(in key, out existing, ref keyHashProvider))
         {
           if (!valueUpdater(ref existing))
           {

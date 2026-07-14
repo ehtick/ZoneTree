@@ -1,4 +1,5 @@
 using ZoneTree.Collections;
+using ZoneTree.Hashers;
 
 namespace ZoneTree.Segments;
 
@@ -10,9 +11,9 @@ public interface IReadOnlySegment<TKey, TValue>
 
   long MaximumOpIndex { get; }
 
-  bool ContainsKey(in TKey key);
+  bool ContainsKey(in TKey key, ref KeyHashProvider<TKey> keyHashProvider);
 
-  bool TryGet(in TKey key, out TValue value);
+  bool TryGet(in TKey key, out TValue value, ref KeyHashProvider<TKey> keyHashProvider);
 
   void Drop();
 

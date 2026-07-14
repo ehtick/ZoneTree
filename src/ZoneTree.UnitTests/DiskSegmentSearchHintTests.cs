@@ -1,5 +1,6 @@
 using ZoneTree.Collections;
 using ZoneTree.Comparers;
+using ZoneTree.Hashers;
 using ZoneTree.Options;
 using ZoneTree.Segments.Block;
 using ZoneTree.Segments.Disk;
@@ -105,7 +106,7 @@ public sealed class DiskSegmentSearchHintTests
 
     AssertGet(segment, 0);
     AssertGet(segment, 1);
-    Assert.Throws<InvalidOperationException>(() => segment.TryGet(2, out _));
+    Assert.Throws<InvalidOperationException>(() => TryGet(segment, 2, out _));
 
     Assert.That(segment.LastBlockPin, Is.Not.Null);
     Assert.That(segment.LastBlockPin.Device1, Is.Null);
@@ -114,8 +115,14 @@ public sealed class DiskSegmentSearchHintTests
 
   static void AssertGet(TestDiskSegment segment, int key)
   {
-    Assert.That(segment.TryGet(key, out var value), Is.True);
+    Assert.That(TryGet(segment, key, out var value), Is.True);
     Assert.That(value, Is.EqualTo(key + 100));
+  }
+
+  static bool TryGet(TestDiskSegment segment, int key, out int value)
+  {
+    var keyHashProvider = new KeyHashProvider<int>();
+    return segment.TryGet(key, out value, ref keyHashProvider);
   }
 
   static TestDiskSegment CreateSegment(

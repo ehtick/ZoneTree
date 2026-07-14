@@ -1,3 +1,4 @@
+using ZoneTree.Hashers;
 using ZoneTree.Options;
 using ZoneTree.Segments.Disk;
 using ZoneTree.Serializers;
@@ -127,13 +128,15 @@ public sealed class DiskSegmentFactoryTests
     {
       for (var i = 0; i < recordCount; ++i)
       {
-        Assert.That(diskSegment.TryGet(keys[i], out var value), Is.True);
+        var keyHashProvider = new KeyHashProvider<TKey>();
+        Assert.That(diskSegment.TryGet(keys[i], out var value, ref keyHashProvider), Is.True);
         Assert.That(value, Is.EqualTo(values[i]));
       }
 
       for (var i = recordCount - 1; i >= 0; --i)
       {
-        Assert.That(diskSegment.TryGet(keys[i], out var value), Is.True);
+        var keyHashProvider = new KeyHashProvider<TKey>();
+        Assert.That(diskSegment.TryGet(keys[i], out var value, ref keyHashProvider), Is.True);
         Assert.That(value, Is.EqualTo(values[i]));
       }
 
@@ -148,7 +151,8 @@ public sealed class DiskSegmentFactoryTests
       ];
       foreach (var index in mixedIndexes)
       {
-        Assert.That(diskSegment.TryGet(keys[index], out var value), Is.True);
+        var keyHashProvider = new KeyHashProvider<TKey>();
+        Assert.That(diskSegment.TryGet(keys[index], out var value, ref keyHashProvider), Is.True);
         Assert.That(value, Is.EqualTo(values[index]));
       }
     }

@@ -63,7 +63,8 @@ public sealed class MultiPartDiskSegmentLeaseTests
         Assert.That(DeviceExists(deviceManager, preservedPart), Is.True);
         Assert.That(DeviceExists(deviceManager, droppedPart), Is.False);
         Assert.That(MultiPartMetadataExists(deviceManager, multiPart), Is.False);
-        Assert.That(preservedPart.TryGet(1, out var value), Is.True);
+        var keyHashProvider = new KeyHashProvider<int>();
+        Assert.That(preservedPart.TryGet(1, out var value, ref keyHashProvider), Is.True);
         Assert.That(value, Is.EqualTo(1));
       });
     }

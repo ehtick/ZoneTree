@@ -4,6 +4,7 @@ using ZoneTree.AbstractFileStream;
 using ZoneTree.Collections;
 using ZoneTree.Comparers;
 using ZoneTree.Exceptions;
+using ZoneTree.Hashers;
 using ZoneTree.Options;
 using ZoneTree.Segments.Block;
 using ZoneTree.Segments.Disk;
@@ -241,7 +242,7 @@ public sealed class MultiPartDiskSegment<TKey, TValue> : IDiskSegment<TKey, TVal
           "Cannot attach an iterator after disk segment retirement has started.");
   }
 
-  public bool ContainsKey(in TKey key)
+  public bool ContainsKey(in TKey key, ref KeyHashProvider<TKey> keyHashProvider)
   {
     var sparseArrayLength = PartKeys.Length;
     (var left, var found) = SearchLastSmallerOrEqualPositionInSparseArray(in key);
@@ -251,7 +252,7 @@ public sealed class MultiPartDiskSegment<TKey, TValue> : IDiskSegment<TKey, TVal
       return false;
 
     var partIndex = left / 2;
-    return Parts[partIndex].ContainsKey(in key);
+    return Parts[partIndex].ContainsKey(in key, ref keyHashProvider);
   }
 
   public void Dispose()
@@ -512,7 +513,7 @@ public sealed class MultiPartDiskSegment<TKey, TValue> : IDiskSegment<TKey, TVal
     }
   }
 
-  public bool TryGet(in TKey key, out TValue value)
+  public bool TryGet(in TKey key, out TValue value, ref KeyHashProvider<TKey> keyHashProvider)
   {
     var sparseArrayLength = PartKeys.Length;
     (var left, var found) = SearchLastSmallerOrEqualPositionInSparseArray(in key);
@@ -528,7 +529,7 @@ public sealed class MultiPartDiskSegment<TKey, TValue> : IDiskSegment<TKey, TVal
     }
 
     var partIndex = left / 2;
-    return Parts[partIndex].TryGet(in key, out value);
+    return Parts[partIndex].TryGet(in key, out value, ref keyHashProvider);
   }
 
   #region Binary search
