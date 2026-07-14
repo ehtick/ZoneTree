@@ -9,6 +9,7 @@ using ZoneTree.Segments.Block;
 using ZoneTree.Segments.Disk;
 using ZoneTree.Segments.RandomAccess;
 using ZoneTree.Serializers;
+using ZoneTree.Synchronization;
 
 namespace ZoneTree.Segments.MultiPart;
 
@@ -28,13 +29,13 @@ public sealed class MultiPartDiskSegment<TKey, TValue> : IDiskSegment<TKey, TVal
 
   readonly ISerializer<TValue> ValueSerializer;
 
-  int IteratorReaderCount;
-
-  bool IsDropRequested;
-
-  bool IsDropped;
+  LifecycleLeaseState IteratorLeaseState;
 
   readonly Lock DropLock = new();
+
+  bool HasPendingDropPlan;
+
+  HashSet<long> PendingDropExcludedPartIds;
 
   readonly IReadOnlyList<IDiskSegment<TKey, TValue>> Parts;
 
@@ -235,10 +236,9 @@ public sealed class MultiPartDiskSegment<TKey, TValue> : IDiskSegment<TKey, TVal
 
   public void AttachIterator()
   {
-    lock (DropLock)
-    {
-      ++IteratorReaderCount;
-    }
+    if (!IteratorLeaseState.TryAcquire())
+      throw new InvalidOperationException(
+          "Cannot attach an iterator after disk segment retirement has started.");
   }
 
   public bool ContainsKey(in TKey key)
@@ -261,57 +261,56 @@ public sealed class MultiPartDiskSegment<TKey, TValue> : IDiskSegment<TKey, TVal
 
   public void Drop()
   {
-    lock (DropLock)
-    {
-      if (IsDropped)
-        return;
-      if (IteratorReaderCount > 0)
-      {
-        // iterators are long-lived objects.
-        // Cancel the drop, and let the iterators
-        // call drop when they are disposed.
-        IsDropRequested = true;
-        return;
-      }
-
-      var len = Parts.Count;
-      for (var i = 0; i < len; ++i)
-        Parts[i].Drop();
-
-      DropMeta();
-
-      IsDropped = true;
-    }
+    RequestDrop(excludedPartIds: null);
   }
 
   public void Drop(HashSet<long> excludedPartIds)
   {
+    RequestDrop(excludedPartIds);
+  }
+
+  void RequestDrop(HashSet<long> excludedPartIds)
+  {
     lock (DropLock)
     {
-      if (IsDropped)
-        return;
-      if (IteratorReaderCount > 0)
+      if (!HasPendingDropPlan)
       {
-        // iterators are long-lived objects.
-        // Cancel the drop, and let the iterators
-        // call drop when they are disposed.
-        IsDropRequested = true;
-        return;
+        HasPendingDropPlan = true;
+        PendingDropExcludedPartIds = excludedPartIds is null
+            ? null
+            : [.. excludedPartIds];
       }
 
+      if (IteratorLeaseState.RequestRetirement())
+        CompleteDrop(PendingDropExcludedPartIds, reportFailure: false);
+    }
+  }
+
+  void CompleteDrop(
+      HashSet<long> excludedPartIds,
+      bool reportFailure)
+  {
+    try
+    {
       var len = Parts.Count;
       for (var i = 0; i < len; ++i)
       {
         var part = Parts[i];
-
-        if (excludedPartIds.Contains(part.SegmentId))
+        if (excludedPartIds?.Contains(part.SegmentId) == true)
           continue;
         part.Drop();
       }
 
       DropMeta();
-
-      IsDropped = true;
+      IteratorLeaseState.CompleteRetirement();
+      PendingDropExcludedPartIds = null;
+    }
+    catch (Exception e)
+    {
+      IteratorLeaseState.CancelRetirementCompletion();
+      if (!reportFailure)
+        throw;
+      DropFailureReporter?.Invoke(this, e);
     }
   }
 
@@ -503,19 +502,12 @@ public sealed class MultiPartDiskSegment<TKey, TValue> : IDiskSegment<TKey, TVal
 
   public void DetachIterator()
   {
-    lock (DropLock)
+    if (IteratorLeaseState.Release())
     {
-      --IteratorReaderCount;
-      if (IsDropRequested && IteratorReaderCount == 0)
+      lock (DropLock)
       {
-        try
-        {
-          Drop();
-        }
-        catch (Exception e)
-        {
-          DropFailureReporter?.Invoke(this, e);
-        }
+        if (IteratorLeaseState.TryBeginRetirementCompletion())
+          CompleteDrop(PendingDropExcludedPartIds, reportFailure: true);
       }
     }
   }

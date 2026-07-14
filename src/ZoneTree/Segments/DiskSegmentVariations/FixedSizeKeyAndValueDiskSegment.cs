@@ -128,14 +128,10 @@ public sealed class FixedSizeKeyAndValueDiskSegment<TKey, TValue> : DiskSegment<
 
   protected override TKey ReadKey(long index, BlockPin blockPin)
   {
+    if (CircularKeyCache.TryGet(index, out var key)) return key;
+    var readStripe = BeginRead();
     try
     {
-      if (CircularKeyCache.TryGet(index, out var key)) return key;
-      Interlocked.Increment(ref ReadCount);
-      if (IsDropping)
-      {
-        throw new DiskSegmentIsDroppingException();
-      }
       var itemSize = KeySize + ValueSize;
       var pin1 = blockPin?.ToSingleBlockPin(1);
       var keyBytes = DataDevice.GetBytes(
@@ -149,20 +145,16 @@ public sealed class FixedSizeKeyAndValueDiskSegment<TKey, TValue> : DiskSegment<
     }
     finally
     {
-      Interlocked.Decrement(ref ReadCount);
+      EndRead(readStripe);
     }
   }
 
   protected override TValue ReadValue(long index, BlockPin blockPin)
   {
+    if (CircularValueCache.TryGet(index, out var value)) return value;
+    var readStripe = BeginRead();
     try
     {
-      if (CircularValueCache.TryGet(index, out var value)) return value;
-      Interlocked.Increment(ref ReadCount);
-      if (IsDropping)
-      {
-        throw new DiskSegmentIsDroppingException();
-      }
       var itemSize = KeySize + ValueSize;
       var pin1 = blockPin?.ToSingleBlockPin(1);
       var valueBytes = DataDevice.GetBytes(
@@ -176,7 +168,7 @@ public sealed class FixedSizeKeyAndValueDiskSegment<TKey, TValue> : DiskSegment<
     }
     finally
     {
-      Interlocked.Decrement(ref ReadCount);
+      EndRead(readStripe);
     }
   }
 
@@ -192,14 +184,9 @@ public sealed class FixedSizeKeyAndValueDiskSegment<TKey, TValue> : DiskSegment<
       return 0;
     count = (int)Math.Min(count, Length - startIndex);
 
+    var readStripe = BeginRead();
     try
     {
-      Interlocked.Increment(ref ReadCount);
-      if (IsDropping)
-      {
-        throw new DiskSegmentIsDroppingException();
-      }
-
       var itemSize = KeySize + ValueSize;
       var pin1 = blockPin?.ToSingleBlockPin(1);
       var bytes = DataDevice.GetBytes(
@@ -241,7 +228,7 @@ public sealed class FixedSizeKeyAndValueDiskSegment<TKey, TValue> : DiskSegment<
     }
     finally
     {
-      Interlocked.Decrement(ref ReadCount);
+      EndRead(readStripe);
     }
   }
 
