@@ -63,150 +63,142 @@ public sealed class BenchmarkRunner(BenchmarkConfig config)
         activeOperation = "initialize";
         await engine.InitializeAsync(config, reset: true, runCt);
         durability = engine.DurabilityDescription;
+        var workers = await CreateWorkersAsync(engine, runCt);
 
-        activeOperation = "insert profiles";
-        phases.Add(await MeasurePhaseAsync(
-            engine,
-            "insert profiles",
-            config.Profiles,
-            async checksum =>
-            {
-              for (var userId = 1; userId <= config.Profiles; userId++)
-              {
-                runCt.ThrowIfCancellationRequested();
-                var profile = Generator.Create(userId);
-                await engine.InsertBatchAsync([profile], runCt);
-                checksum.Add(profile.UserId);
-              }
-            },
-            runCt));
+        try
+        {
+          activeOperation = "insert profiles";
+          phases.Add(await MeasureInsertPhaseAsync(workers, runCt));
 
-        activeOperation = "pre-read stabilization";
-        preReadStabilizeMs = await StabilizeForReadMeasurementsAsync(engine, "pre-read stabilization", runCt);
+          activeOperation = "pre-read stabilization";
+          preReadStabilizeMs = await StabilizeForReadMeasurementsAsync(engine, "pre-read stabilization", runCt);
 
-        activeOperation = "read by user id";
-        phases.Add(await MeasureProfileReadPhaseAsync(
-            engine,
-            "read by user id",
-            Plan.PointReadIds,
-            (id, token) => engine.GetByUserIdAsync(id, token),
-            runCt));
+          activeOperation = "read by user id";
+          phases.Add(await MeasureProfileReadPhaseAsync(
+              engine,
+              workers,
+              "read by user id",
+              Plan.PointReadIds,
+              (worker, id, token) => worker.GetByUserIdAsync(id, token),
+              runCt));
 
-        activeOperation = "lookup by email";
-        phases.Add(await MeasureProfileReadPhaseAsync(
-            engine,
-            "lookup by email",
-            Plan.EmailReadIds,
-            (id, token) => engine.GetByEmailAsync(Generator.Create(id).Email, token),
-            runCt));
+          activeOperation = "lookup by email";
+          phases.Add(await MeasureProfileReadPhaseAsync(
+              engine,
+              workers,
+              "lookup by email",
+              Plan.EmailReadIds,
+              (worker, id, token) => worker.GetByEmailAsync(Generator.Create(id).Email, token),
+              runCt));
 
-        activeOperation = "scan country/status index";
-        phases.Add(await MeasureIndexQueryPhaseAsync(
-            "scan country/status index",
-            Plan.CountryStatusQueries,
-            query => engine.ScanCountryStatusIndexAsync(query.Country, query.Status, config.QueryLimit, runCt),
-            runCt));
+          activeOperation = "scan country/status index";
+          phases.Add(await MeasureIndexQueryPhaseAsync(
+              workers,
+              "scan country/status index",
+              Plan.CountryStatusQueries,
+              (worker, query) => worker.ScanCountryStatusIndexAsync(query.Country, query.Status, config.QueryLimit, runCt),
+              runCt));
 
-        activeOperation = "query country/status";
-        phases.Add(await MeasureQueryPhaseAsync(
-            "query country/status",
-            Plan.CountryStatusQueries,
-            query => engine.QueryCountryStatusAsync(query.Country, query.Status, config.QueryLimit, runCt),
-            runCt));
+          activeOperation = "query country/status";
+          phases.Add(await MeasureQueryPhaseAsync(
+              workers,
+              "query country/status",
+              Plan.CountryStatusQueries,
+              (worker, query) => worker.QueryCountryStatusAsync(query.Country, query.Status, config.QueryLimit, runCt),
+              runCt));
 
-        activeOperation = "scan created-at index";
-        phases.Add(await MeasureIndexQueryPhaseAsync(
-            "scan created-at index",
-            Plan.CreatedAtRangeQueries,
-            query => engine.ScanCreatedAtRangeIndexAsync(query.FromUnixMs, query.ToUnixMs, config.QueryLimit, runCt),
-            runCt));
+          activeOperation = "scan created-at index";
+          phases.Add(await MeasureIndexQueryPhaseAsync(
+              workers,
+              "scan created-at index",
+              Plan.CreatedAtRangeQueries,
+              (worker, query) => worker.ScanCreatedAtRangeIndexAsync(query.FromUnixMs, query.ToUnixMs, config.QueryLimit, runCt),
+              runCt));
 
-        activeOperation = "query created-at range";
-        phases.Add(await MeasureQueryPhaseAsync(
-            "query created-at range",
-            Plan.CreatedAtRangeQueries,
-            query => engine.QueryCreatedAtRangeAsync(query.FromUnixMs, query.ToUnixMs, config.QueryLimit, runCt),
-            runCt));
+          activeOperation = "query created-at range";
+          phases.Add(await MeasureQueryPhaseAsync(
+              workers,
+              "query created-at range",
+              Plan.CreatedAtRangeQueries,
+              (worker, query) => worker.QueryCreatedAtRangeAsync(query.FromUnixMs, query.ToUnixMs, config.QueryLimit, runCt),
+              runCt));
 
-        activeOperation = "scan top reputation index";
-        phases.Add(await MeasureRepeatedIndexQueryPhaseAsync(
-            "scan top reputation index",
-            config.QueryCount,
-            () => engine.ScanTopReputationIndexAsync(config.QueryLimit, runCt),
-            runCt));
+          activeOperation = "scan top reputation index";
+          phases.Add(await MeasureRepeatedIndexQueryPhaseAsync(
+              workers,
+              "scan top reputation index",
+              config.QueryCount,
+              worker => worker.ScanTopReputationIndexAsync(config.QueryLimit, runCt),
+              runCt));
 
-        activeOperation = "query top reputation";
-        phases.Add(await MeasureRepeatedQueryPhaseAsync(
-            "query top reputation",
-            config.QueryCount,
-            () => engine.QueryTopReputationAsync(config.QueryLimit, runCt),
-            runCt));
+          activeOperation = "query top reputation";
+          phases.Add(await MeasureRepeatedQueryPhaseAsync(
+              workers,
+              "query top reputation",
+              config.QueryCount,
+              worker => worker.QueryTopReputationAsync(config.QueryLimit, runCt),
+              runCt));
 
-        activeOperation = "update profiles";
-        phases.Add(await MeasurePhaseAsync(
-            engine,
-            "update profiles",
-            Plan.UpdateIds.Length,
-            async checksum =>
-            {
-              foreach (var id in Plan.UpdateIds)
-              {
-                runCt.ThrowIfCancellationRequested();
-                var current = await engine.GetByUserIdAsync(id, runCt)
-                    ?? throw new InvalidOperationException($"{engine.Name} missing profile {id}");
-                var updated = Generator.Update(current);
-                await engine.UpdateBatchAsync([updated], runCt);
-                checksum.Add(updated);
-              }
-            },
-            runCt));
+          activeOperation = "update profiles";
+          phases.Add(await MeasureUpdatePhaseAsync(engine, workers, runCt));
 
-        activeOperation = "post-update stabilization";
-        postUpdateStabilizeMs = await StabilizeForReadMeasurementsAsync(engine, "post-update stabilization", runCt);
+          activeOperation = "post-update stabilization";
+          postUpdateStabilizeMs = await StabilizeForReadMeasurementsAsync(engine, "post-update stabilization", runCt);
 
-        activeOperation = "post-update read by user id";
-        phases.Add(await MeasureProfileReadPhaseAsync(
-            engine,
-            "post-update read by user id",
-            Plan.PostPointReadIds,
-            (id, token) => engine.GetByUserIdAsync(id, token),
-            runCt));
+          activeOperation = "post-update read by user id";
+          phases.Add(await MeasureProfileReadPhaseAsync(
+              engine,
+              workers,
+              "post-update read by user id",
+              Plan.PostPointReadIds,
+              (worker, id, token) => worker.GetByUserIdAsync(id, token),
+              runCt));
 
-        activeOperation = "post-update lookup by email";
-        phases.Add(await MeasureProfileReadPhaseAsync(
-            engine,
-            "post-update lookup by email",
-            Plan.PostEmailReadIds,
-            (id, token) => engine.GetByEmailAsync(Generator.Create(id).Email, token),
-            runCt));
+          activeOperation = "post-update lookup by email";
+          phases.Add(await MeasureProfileReadPhaseAsync(
+              engine,
+              workers,
+              "post-update lookup by email",
+              Plan.PostEmailReadIds,
+              (worker, id, token) => worker.GetByEmailAsync(Generator.Create(id).Email, token),
+              runCt));
 
-        activeOperation = "post-update scan country/status index";
-        phases.Add(await MeasureIndexQueryPhaseAsync(
-            "post-update scan country/status index",
-            Plan.PostCountryStatusQueries,
-            query => engine.ScanCountryStatusIndexAsync(query.Country, query.Status, config.QueryLimit, runCt),
-            runCt));
+          activeOperation = "post-update scan country/status index";
+          phases.Add(await MeasureIndexQueryPhaseAsync(
+              workers,
+              "post-update scan country/status index",
+              Plan.PostCountryStatusQueries,
+              (worker, query) => worker.ScanCountryStatusIndexAsync(query.Country, query.Status, config.QueryLimit, runCt),
+              runCt));
 
-        activeOperation = "post-update query country/status";
-        phases.Add(await MeasureQueryPhaseAsync(
-            "post-update query country/status",
-            Plan.PostCountryStatusQueries,
-            query => engine.QueryCountryStatusAsync(query.Country, query.Status, config.QueryLimit, runCt),
-            runCt));
+          activeOperation = "post-update query country/status";
+          phases.Add(await MeasureQueryPhaseAsync(
+              workers,
+              "post-update query country/status",
+              Plan.PostCountryStatusQueries,
+              (worker, query) => worker.QueryCountryStatusAsync(query.Country, query.Status, config.QueryLimit, runCt),
+              runCt));
 
-        activeOperation = "post-update scan top reputation index";
-        phases.Add(await MeasureRepeatedIndexQueryPhaseAsync(
-            "post-update scan top reputation index",
-            config.PostQueryCount,
-            () => engine.ScanTopReputationIndexAsync(config.QueryLimit, runCt),
-            runCt));
+          activeOperation = "post-update scan top reputation index";
+          phases.Add(await MeasureRepeatedIndexQueryPhaseAsync(
+              workers,
+              "post-update scan top reputation index",
+              config.PostQueryCount,
+              worker => worker.ScanTopReputationIndexAsync(config.QueryLimit, runCt),
+              runCt));
 
-        activeOperation = "post-update query top reputation";
-        phases.Add(await MeasureRepeatedQueryPhaseAsync(
-            "post-update query top reputation",
-            config.PostQueryCount,
-            () => engine.QueryTopReputationAsync(config.QueryLimit, runCt),
-            runCt));
+          activeOperation = "post-update query top reputation";
+          phases.Add(await MeasureRepeatedQueryPhaseAsync(
+              workers,
+              "post-update query top reputation",
+              config.PostQueryCount,
+              worker => worker.QueryTopReputationAsync(config.QueryLimit, runCt),
+              runCt));
+        }
+        finally
+        {
+          await DisposeWorkersAsync(workers);
+        }
 
         activeOperation = "settle";
         (settleMs, _) = await Timing.MeasureAsync(async () =>
@@ -230,10 +222,11 @@ public sealed class BenchmarkRunner(BenchmarkConfig config)
       {
         var checksum = new Checksum();
         checksum.Add(await reopened.CountProfilesAsync(runCt));
+        await using var worker = await reopened.CreateWorkerAsync(runCt);
         foreach (var id in new[] { 1L, Math.Max(1, config.Profiles / 2), (long)config.Profiles })
         {
           runCt.ThrowIfCancellationRequested();
-          var profile = await reopened.GetByUserIdAsync(id, runCt)
+          var profile = await worker.GetByUserIdAsync(id, runCt)
               ?? throw new InvalidOperationException($"{reopened.Name} missing profile {id} after reopen");
           checksum.Add(profile);
         }
@@ -281,6 +274,7 @@ public sealed class BenchmarkRunner(BenchmarkConfig config)
   {
     return new BenchmarkWorkloadConfig(
         config.Profiles,
+        config.Parallelism,
         config.ReadCount,
         config.EmailReadCount,
         config.QueryCount,
@@ -336,23 +330,6 @@ public sealed class BenchmarkRunner(BenchmarkConfig config)
     };
   }
 
-  async Task<PhaseResult> MeasurePhaseAsync(
-      IProfileStoreEngine engine,
-      string name,
-      long operations,
-      Func<Checksum, Task> action,
-      CancellationToken ct)
-  {
-    Console.Write($"  {name}... ");
-    var checksum = new Checksum();
-    var sw = Stopwatch.StartNew();
-    await action(checksum);
-    sw.Stop();
-    var throughput = operations / Math.Max(sw.Elapsed.TotalSeconds, 0.001);
-    Console.WriteLine($"{sw.Elapsed.TotalSeconds:N2}s ({throughput:N0}/s)");
-    return new PhaseResult(name, operations, sw.Elapsed.TotalMilliseconds, throughput, checksum.Hex);
-  }
-
   static async Task<double?> StabilizeForReadMeasurementsAsync(
       IProfileStoreEngine engine,
       string name,
@@ -369,23 +346,101 @@ public sealed class BenchmarkRunner(BenchmarkConfig config)
     return sw.Elapsed.TotalMilliseconds;
   }
 
-  async Task<PhaseResult> MeasureProfileReadPhaseAsync(
+  async Task<IReadOnlyList<IProfileStoreEngineWorker>> CreateWorkersAsync(
       IProfileStoreEngine engine,
-      string name,
-      IReadOnlyList<long> ids,
-      Func<long, CancellationToken, Task<UserProfile?>> read,
       CancellationToken ct)
   {
-    return await MeasurePhaseAsync(
-        engine,
-        name,
-        ids.Count,
-        async checksum =>
+    var workers = new List<IProfileStoreEngineWorker>(config.Parallelism);
+    try
+    {
+      for (var i = 0; i < config.Parallelism; i++)
+        workers.Add(await engine.CreateWorkerAsync(ct));
+      return workers;
+    }
+    catch
+    {
+      await DisposeWorkersAsync(workers);
+      throw;
+    }
+  }
+
+  static async Task DisposeWorkersAsync(IEnumerable<IProfileStoreEngineWorker> workers)
+  {
+    foreach (var worker in workers)
+      await worker.DisposeAsync();
+  }
+
+  Task<PhaseResult> MeasureInsertPhaseAsync(
+      IReadOnlyList<IProfileStoreEngineWorker> workers,
+      CancellationToken ct)
+  {
+    return MeasureParallelPhaseAsync(
+        "insert profiles",
+        config.Profiles,
+        config.Profiles,
+        workers,
+        async (worker, start, count, checksum) =>
         {
-          foreach (var id in ids)
+          for (var offset = 0; offset < count; offset++)
           {
             ct.ThrowIfCancellationRequested();
-            var profile = await read(id, ct)
+            var userId = start + offset + 1L;
+            var profile = Generator.Create(userId);
+            await worker.InsertBatchAsync([profile], ct);
+            checksum.Add(profile.UserId);
+          }
+        },
+        ct);
+  }
+
+  Task<PhaseResult> MeasureUpdatePhaseAsync(
+      IProfileStoreEngine engine,
+      IReadOnlyList<IProfileStoreEngineWorker> workers,
+      CancellationToken ct)
+  {
+    var buckets = new List<long>[workers.Count];
+    for (var i = 0; i < buckets.Length; i++)
+      buckets[i] = [];
+    foreach (var id in Plan.UpdateIds)
+      buckets[(int)(id % workers.Count)].Add(id);
+
+    return MeasureParallelBucketsPhaseAsync(
+        "update profiles",
+        Plan.UpdateIds.Length,
+        workers,
+        buckets,
+        async (worker, id, checksum) =>
+        {
+          ct.ThrowIfCancellationRequested();
+          var current = await worker.GetByUserIdAsync(id, ct)
+              ?? throw new InvalidOperationException($"{engine.Name} missing profile {id}");
+          var updated = Generator.Update(current);
+          await worker.UpdateBatchAsync([updated], ct);
+          checksum.Add(updated);
+        },
+        ct);
+  }
+
+  async Task<PhaseResult> MeasureProfileReadPhaseAsync(
+      IProfileStoreEngine engine,
+      IReadOnlyList<IProfileStoreEngineWorker> workers,
+      string name,
+      IReadOnlyList<long> ids,
+      Func<IProfileStoreEngineWorker, long, CancellationToken, Task<UserProfile?>> read,
+      CancellationToken ct)
+  {
+    return await MeasureParallelPhaseAsync(
+        name,
+        ids.Count,
+        ids.Count,
+        workers,
+        async (worker, start, count, checksum) =>
+        {
+          for (var i = start; i < start + count; i++)
+          {
+            ct.ThrowIfCancellationRequested();
+            var id = ids[i];
+            var profile = await read(worker, id, ct)
                 ?? throw new InvalidOperationException($"{engine.Name} missing profile {id}");
             checksum.Add(profile);
           }
@@ -394,91 +449,193 @@ public sealed class BenchmarkRunner(BenchmarkConfig config)
   }
 
   async Task<PhaseResult> MeasureQueryPhaseAsync<TQuery>(
+      IReadOnlyList<IProfileStoreEngineWorker> workers,
       string name,
       IReadOnlyList<TQuery> queries,
-      Func<TQuery, Task<IReadOnlyList<UserProfile>>> query,
+      Func<IProfileStoreEngineWorker, TQuery, Task<IReadOnlyList<UserProfile>>> query,
       CancellationToken ct)
   {
-    Console.Write($"  {name}... ");
-    var checksum = new Checksum();
-    var sw = Stopwatch.StartNew();
-    foreach (var item in queries)
-    {
-      ct.ThrowIfCancellationRequested();
-      var profiles = await query(item);
-      foreach (var profile in profiles)
-        checksum.Add(profile);
-    }
-    sw.Stop();
-    var throughput = queries.Count / Math.Max(sw.Elapsed.TotalSeconds, 0.001);
-    Console.WriteLine($"{sw.Elapsed.TotalSeconds:N2}s ({throughput:N0}/s)");
-    return new PhaseResult(name, queries.Count, sw.Elapsed.TotalMilliseconds, throughput, checksum.Hex);
+    return await MeasureParallelPhaseAsync(
+        name,
+        queries.Count,
+        queries.Count,
+        workers,
+        async (worker, start, count, checksum) =>
+        {
+          for (var i = start; i < start + count; i++)
+          {
+            ct.ThrowIfCancellationRequested();
+            var profiles = await query(worker, queries[i]);
+            foreach (var profile in profiles)
+              checksum.Add(profile);
+          }
+        },
+        ct);
   }
 
   async Task<PhaseResult> MeasureIndexQueryPhaseAsync<TQuery>(
+      IReadOnlyList<IProfileStoreEngineWorker> workers,
       string name,
       IReadOnlyList<TQuery> queries,
-      Func<TQuery, Task<IReadOnlyList<long>>> query,
+      Func<IProfileStoreEngineWorker, TQuery, Task<IReadOnlyList<long>>> query,
       CancellationToken ct)
   {
-    Console.Write($"  {name}... ");
-    var checksum = new Checksum();
-    var sw = Stopwatch.StartNew();
-    foreach (var item in queries)
-    {
-      ct.ThrowIfCancellationRequested();
-      var userIds = await query(item);
-      foreach (var userId in userIds)
-        checksum.Add(userId);
-    }
-    sw.Stop();
-    var throughput = queries.Count / Math.Max(sw.Elapsed.TotalSeconds, 0.001);
-    Console.WriteLine($"{sw.Elapsed.TotalSeconds:N2}s ({throughput:N0}/s)");
-    return new PhaseResult(name, queries.Count, sw.Elapsed.TotalMilliseconds, throughput, checksum.Hex);
+    return await MeasureParallelPhaseAsync(
+        name,
+        queries.Count,
+        queries.Count,
+        workers,
+        async (worker, start, count, checksum) =>
+        {
+          for (var i = start; i < start + count; i++)
+          {
+            ct.ThrowIfCancellationRequested();
+            var userIds = await query(worker, queries[i]);
+            foreach (var userId in userIds)
+              checksum.Add(userId);
+          }
+        },
+        ct);
   }
 
   async Task<PhaseResult> MeasureRepeatedQueryPhaseAsync(
+      IReadOnlyList<IProfileStoreEngineWorker> workers,
       string name,
       int count,
-      Func<Task<IReadOnlyList<UserProfile>>> query,
+      Func<IProfileStoreEngineWorker, Task<IReadOnlyList<UserProfile>>> query,
       CancellationToken ct)
   {
-    Console.Write($"  {name}... ");
-    var checksum = new Checksum();
-    var sw = Stopwatch.StartNew();
-    for (var i = 0; i < count; i++)
-    {
-      ct.ThrowIfCancellationRequested();
-      var profiles = await query();
-      foreach (var profile in profiles)
-        checksum.Add(profile);
-    }
-    sw.Stop();
-    var throughput = count / Math.Max(sw.Elapsed.TotalSeconds, 0.001);
-    Console.WriteLine($"{sw.Elapsed.TotalSeconds:N2}s ({throughput:N0}/s)");
-    return new PhaseResult(name, count, sw.Elapsed.TotalMilliseconds, throughput, checksum.Hex);
+    return await MeasureParallelPhaseAsync(
+        name,
+        count,
+        count,
+        workers,
+        async (worker, _, localCount, checksum) =>
+        {
+          for (var i = 0; i < localCount; i++)
+          {
+            ct.ThrowIfCancellationRequested();
+            var profiles = await query(worker);
+            foreach (var profile in profiles)
+              checksum.Add(profile);
+          }
+        },
+        ct);
   }
 
   async Task<PhaseResult> MeasureRepeatedIndexQueryPhaseAsync(
+      IReadOnlyList<IProfileStoreEngineWorker> workers,
       string name,
       int count,
-      Func<Task<IReadOnlyList<long>>> query,
+      Func<IProfileStoreEngineWorker, Task<IReadOnlyList<long>>> query,
+      CancellationToken ct)
+  {
+    return await MeasureParallelPhaseAsync(
+        name,
+        count,
+        count,
+        workers,
+        async (worker, _, localCount, checksum) =>
+        {
+          for (var i = 0; i < localCount; i++)
+          {
+            ct.ThrowIfCancellationRequested();
+            var userIds = await query(worker);
+            foreach (var userId in userIds)
+              checksum.Add(userId);
+          }
+        },
+        ct);
+  }
+
+  async Task<PhaseResult> MeasureParallelPhaseAsync(
+      string name,
+      long operations,
+      int partitionedOperations,
+      IReadOnlyList<IProfileStoreEngineWorker> workers,
+      Func<IProfileStoreEngineWorker, int, int, Checksum, Task> action,
       CancellationToken ct)
   {
     Console.Write($"  {name}... ");
-    var checksum = new Checksum();
-    var sw = Stopwatch.StartNew();
-    for (var i = 0; i < count; i++)
+    var startGate = new ParallelPhaseStartGate(workers.Count);
+    var tasks = new Task<string?>[workers.Count];
+    for (var workerIndex = 0; workerIndex < workers.Count; workerIndex++)
     {
-      ct.ThrowIfCancellationRequested();
-      var userIds = await query();
-      foreach (var userId in userIds)
-        checksum.Add(userId);
+      var index = workerIndex;
+      var (start, count) = GetPartition(partitionedOperations, index, workers.Count);
+      tasks[index] = Task.Run(async () =>
+      {
+        await startGate.WaitAsync(ct);
+        if (count == 0)
+          return null;
+        var checksum = new Checksum();
+        await action(workers[index], start, count, checksum);
+        return checksum.Hex;
+      });
     }
+    await startGate.WaitUntilReadyAsync();
+    var sw = Stopwatch.StartNew();
+    startGate.Release();
+    var checksums = await Task.WhenAll(tasks);
     sw.Stop();
-    var throughput = count / Math.Max(sw.Elapsed.TotalSeconds, 0.001);
+    var throughput = operations / Math.Max(sw.Elapsed.TotalSeconds, 0.001);
     Console.WriteLine($"{sw.Elapsed.TotalSeconds:N2}s ({throughput:N0}/s)");
-    return new PhaseResult(name, count, sw.Elapsed.TotalMilliseconds, throughput, checksum.Hex);
+    return new PhaseResult(name, operations, sw.Elapsed.TotalMilliseconds, throughput, CombineChecksums(checksums));
+  }
+
+  async Task<PhaseResult> MeasureParallelBucketsPhaseAsync<T>(
+      string name,
+      long operations,
+      IReadOnlyList<IProfileStoreEngineWorker> workers,
+      IReadOnlyList<IReadOnlyList<T>> buckets,
+      Func<IProfileStoreEngineWorker, T, Checksum, Task> action,
+      CancellationToken ct)
+  {
+    Console.Write($"  {name}... ");
+    var startGate = new ParallelPhaseStartGate(workers.Count);
+    var tasks = new Task<string?>[workers.Count];
+    for (var workerIndex = 0; workerIndex < workers.Count; workerIndex++)
+    {
+      var index = workerIndex;
+      tasks[index] = Task.Run(async () =>
+      {
+        await startGate.WaitAsync(ct);
+        if (buckets[index].Count == 0)
+          return null;
+        var checksum = new Checksum();
+        foreach (var item in buckets[index])
+          await action(workers[index], item, checksum);
+        return checksum.Hex;
+      });
+    }
+    await startGate.WaitUntilReadyAsync();
+    var sw = Stopwatch.StartNew();
+    startGate.Release();
+    var checksums = await Task.WhenAll(tasks);
+    sw.Stop();
+    var throughput = operations / Math.Max(sw.Elapsed.TotalSeconds, 0.001);
+    Console.WriteLine($"{sw.Elapsed.TotalSeconds:N2}s ({throughput:N0}/s)");
+    return new PhaseResult(name, operations, sw.Elapsed.TotalMilliseconds, throughput, CombineChecksums(checksums));
+  }
+
+  static (int Start, int Count) GetPartition(int total, int index, int partitions)
+  {
+    var baseCount = total / partitions;
+    var remainder = total % partitions;
+    var count = baseCount + (index < remainder ? 1 : 0);
+    var start = index * baseCount + Math.Min(index, remainder);
+    return (start, count);
+  }
+
+  static string CombineChecksums(IReadOnlyList<string?> checksums)
+  {
+    var active = checksums.Where(x => x != null).ToArray();
+    if (active.Length == 1)
+      return active[0]!;
+    var checksum = new Checksum();
+    foreach (var value in active)
+      checksum.Add(value!);
+    return checksum.Hex;
   }
 
   public static IReadOnlyList<string> ExpandEngines(string engine)
@@ -592,5 +749,28 @@ public sealed class BenchmarkRunner(BenchmarkConfig config)
     {
       return null;
     }
+  }
+
+  sealed class ParallelPhaseStartGate
+  {
+    readonly TaskCompletionSource Ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    readonly TaskCompletionSource Start = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    int Remaining;
+
+    public ParallelPhaseStartGate(int participantCount)
+    {
+      Remaining = participantCount;
+    }
+
+    public async Task WaitAsync(CancellationToken ct)
+    {
+      if (Interlocked.Decrement(ref Remaining) == 0)
+        Ready.TrySetResult();
+      await Start.Task.WaitAsync(ct);
+    }
+
+    public Task WaitUntilReadyAsync() => Ready.Task;
+
+    public void Release() => Start.TrySetResult();
   }
 }

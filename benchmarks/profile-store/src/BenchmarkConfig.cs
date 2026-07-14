@@ -14,6 +14,11 @@ public sealed record BenchmarkConfig
   [JsonIgnore]
   public IReadOnlyList<int> ProfileCounts { get; init; } = [100_000];
 
+  public int Parallelism { get; init; } = 1;
+
+  [JsonIgnore]
+  public IReadOnlyList<int> ParallelismLevels { get; init; } = [1];
+
   public int ReadCount { get; init; } = -1;
 
   public int EmailReadCount { get; init; } = -1;
@@ -28,7 +33,7 @@ public sealed record BenchmarkConfig
 
   public int PostQueryCount { get; init; } = -1;
 
-  public int QueryLimit { get; init; } = 100;
+  public int QueryLimit { get; init; } = 50;
 
   public int Seed { get; init; } = 570123434;
 
@@ -104,6 +109,7 @@ public sealed record BenchmarkConfig
       {
         "--engine" => config with { Engine = next() },
         "--profiles" => config.WithProfileCounts(next()),
+        "--parallelism" => config.WithParallelismLevels(next()),
         "--read-count" => config with { ReadCount = int.Parse(next()) },
         "--email-read-count" => config with { EmailReadCount = int.Parse(next()) },
         "--query-count" => config with { QueryCount = int.Parse(next()) },
@@ -146,6 +152,11 @@ public sealed record BenchmarkConfig
     {
       if (profiles <= 0)
         throw new ArgumentOutOfRangeException(nameof(config.Profiles));
+    }
+    foreach (var parallelism in config.ParallelismLevels)
+    {
+      if (parallelism <= 0)
+        throw new ArgumentOutOfRangeException(nameof(config.Parallelism));
     }
     if (config.TimeoutSeconds < 0)
       throw new ArgumentOutOfRangeException(nameof(config.TimeoutSeconds));
@@ -194,8 +205,22 @@ public sealed record BenchmarkConfig
     return this with { Profiles = counts[0], ProfileCounts = counts };
   }
 
+  BenchmarkConfig WithParallelismLevels(string value)
+  {
+    var levels = value
+        .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .Select(int.Parse)
+        .ToArray();
+    if (levels.Length == 0)
+      throw new ArgumentException("At least one parallelism level is required.", nameof(value));
+    return this with { Parallelism = levels[0], ParallelismLevels = levels };
+  }
+
   public BenchmarkConfig ForProfileCount(int profiles) =>
       (this with { Profiles = profiles, ProfileCounts = [profiles] }).ApplyDefaultWorkloadCounts();
+
+  public BenchmarkConfig ForParallelism(int parallelism) =>
+      this with { Parallelism = parallelism, ParallelismLevels = [parallelism] };
 
   BenchmarkConfig ApplyDefaultWorkloadCounts()
   {
@@ -254,6 +279,8 @@ public sealed record BenchmarkConfig
     yield return engine;
     yield return "--profiles";
     yield return Profiles.ToString();
+    yield return "--parallelism";
+    yield return Parallelism.ToString();
     yield return "--read-count";
     yield return ReadCount.ToString();
     yield return "--email-read-count";

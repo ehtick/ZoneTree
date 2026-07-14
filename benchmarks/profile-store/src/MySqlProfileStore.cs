@@ -2,7 +2,7 @@ using MySqlConnector;
 
 namespace ProfileStore.Benchmark;
 
-public sealed class MySqlProfileStore : IProfileStoreEngine
+public sealed class MySqlProfileStore : IProfileStoreEngine, IProfileStoreEngineWorker
 {
   MySqlConnection? Connection;
   MySqlCommand? InsertCommand;
@@ -33,6 +33,21 @@ public sealed class MySqlProfileStore : IProfileStoreEngine
     if (reset)
       await ExecuteAsync("DROP TABLE IF EXISTS profiles;", ct);
     await CreateSchemaAsync(ct);
+    await PrepareCommandsAsync(ct);
+  }
+
+  public async Task<IProfileStoreEngineWorker> CreateWorkerAsync(CancellationToken ct)
+  {
+    var worker = new MySqlProfileStore();
+    await worker.InitializeWorkerAsync(Config, ct);
+    return worker;
+  }
+
+  async Task InitializeWorkerAsync(BenchmarkConfig config, CancellationToken ct)
+  {
+    Config = config;
+    Connection = new MySqlConnection(ConnectionString(config));
+    await OpenWithRetryAsync(Connection, ct);
     await PrepareCommandsAsync(ct);
   }
 
