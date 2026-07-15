@@ -1,8 +1,20 @@
 # Maintenance
 
-The maintainer is the normal way to run ZoneTree maintenance in a service. Keep
-one maintainer alive for each active tree so merge work and inactive cache
-cleanup happen in the background.
+ZoneTree exposes two maintenance layers:
+
+* `CreateMaintainer()` returns an optional, ready-to-use maintenance
+  coordinator.
+* `zoneTree.Maintenance` exposes segment state, counters, lifecycle events, and
+  operations for custom maintenance policy.
+
+ZoneTree can operate without a maintainer. Without one, the maintainer's
+event-driven merge policy, merge-thread tracking, periodic cache cleanup, and
+disposal coordination do not run. Omitting the maintainer transfers
+responsibility for maintenance policy and coordination to the caller.
+`zoneTree.Maintenance` is the supported surface for that custom implementation,
+exposing the required state, counters, events, and operations.
+
+## Create A Maintainer
 
 ```csharp
 using var zoneTree = new ZoneTreeFactory<int, string>()
@@ -12,16 +24,23 @@ using var zoneTree = new ZoneTreeFactory<int, string>()
 using var maintainer = zoneTree.CreateMaintainer();
 ```
 
-`CreateMaintainer()` attaches to the tree's maintenance events. After writes move
-the mutable segment forward, the maintainer decides whether to start a merge. It
-also starts the periodic cleanup job for disk-read caches.
+The maintainer:
 
-For most applications, this is the whole maintenance setup.
+* subscribes to ZoneTree lifecycle events,
+* starts normal merges according to configurable thresholds,
+* retries or schedules follow-up merges for retryable merge results,
+* tracks normal and bottom merge threads for waiting and cancellation,
+* periodically releases inactive read buffers and circular-cache entries,
+* provides explicit merge, bottom-merge, and eviction methods,
+* waits for its tracked merge threads during disposal.
+
+The returned maintainer is caller-owned and disposable. Disposal waits for its
+tracked merge threads to finish.
 
 ## Merge Triggers
 
 The default maintainer starts a normal merge after the mutable segment moves
-forward and either trigger is reached:
+forward and either configured limit is exceeded:
 
 | Setting | Default | Meaning |
 | --- | ---: | --- |
@@ -79,6 +98,11 @@ maintainer.WaitForBackgroundThreads();
 `TryCancelBackgroundThreads()` asks active normal and bottom-segment merges to
 cancel. The merge threads finish when they observe the cancellation request.
 
+`Dispose()` waits for tracked merge threads, stops periodic cleanup, and detaches
+event handlers. Call `WaitForBackgroundThreads()` when later code must observe
+merge completion before disposal. Call `TryCancelBackgroundThreads()` before
+disposal to request cancellation of current merge work.
+
 ## Cache Cleanup
 
 The default maintainer starts inactive cache cleanup automatically.
@@ -98,7 +122,7 @@ Longer cache lifetime can help repeated disk reads. Shorter cache lifetime
 reduces retained read-cache memory. The cleanup job releases inactive
 decompressed blocks and expired circular key/value cache records.
 
-For read-cache details, see [read-path caching](../storage/read-path-caching.md).
+For read-cache details, see [read-path caching](../tuning/read-path-caching.md).
 
 ## Bottom Segment Merge
 
@@ -120,10 +144,11 @@ maintainer.WaitForBackgroundThreads();
 The range uses the current bottom segment order. A broad range such as
 `0..int.MaxValue` asks ZoneTree to merge as much of the bottom layer as possible.
 
-## Direct Maintenance API
+## Custom Maintenance Control
 
-`zoneTree.Maintenance` exposes the lower-level operations used by the maintainer.
-Use it when your application owns its own scheduler.
+`zoneTree.Maintenance` exposes the state, lifecycle events, and lower-level
+operations used to build custom maintenance policy. Use it to integrate
+maintenance with a scheduler, monitoring system, or storage orchestrator.
 
 ```csharp
 zoneTree.Maintenance.MoveMutableSegmentForward();
@@ -221,7 +246,7 @@ snapshot-iterator usage under write load can increase read-only segment pressure
 
 ## Practical Patterns
 
-For a normal service:
+For the default maintenance model:
 
 ```csharp
 using var zoneTree = new ZoneTreeFactory<int, string>()
@@ -231,8 +256,6 @@ using var zoneTree = new ZoneTreeFactory<int, string>()
 using var maintainer = zoneTree.CreateMaintainer();
 
 // run application
-
-maintainer.WaitForBackgroundThreads();
 ```
 
 For a controlled checkpoint:
@@ -253,4 +276,4 @@ maintainer.WaitForBackgroundThreads();
 
 For related tuning, see [memory usage](../storage/memory-usage.md),
 [disk segment tuning](../tuning/disk-segments.md), and
-[read-path caching](../storage/read-path-caching.md).
+[read-path caching](../tuning/read-path-caching.md).

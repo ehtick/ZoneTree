@@ -12,6 +12,7 @@ Common causes:
 * key/value type mismatch,
 * comparer or serializer type mismatch,
 * incompatible persisted comparer behavior,
+* a case-insensitive string comparer paired with an incompatible hasher,
 * metadata or WAL corruption.
 
 First actions:
@@ -34,7 +35,8 @@ Likely pressure:
 
 First actions:
 
-* keep a maintainer alive for long-running write-heavy workloads,
+* if maintenance is part of the workload, verify that its maintainer or custom
+  event-driven maintenance policy is running as intended,
 * use `Upsert` for simple inserts and replacements,
 * use atomic methods only when the new value depends on the current value,
 * use transactions only when several keys must change together,
@@ -55,11 +57,11 @@ Likely pressure:
 
 First actions:
 
-* keep `zoneTree.CreateMaintainer()` alive while the tree is active,
+* create a maintainer for automatic merging, or verify that the custom
+  maintenance controller observes state/events and starts merges as intended,
 * inspect `OnMergeOperationEnded`,
 * lower mutable segment size if memory pressure is high,
-* inspect merge failures in logs,
-* call `WaitForBackgroundThreads()` during controlled shutdown.
+* inspect merge failures in logs.
 
 Useful merge results:
 
@@ -81,7 +83,10 @@ Likely pressure:
 * sparse array density is too low,
 * decompressed block cache lifetime is too short for the working set,
 * key/value circular caches are too small for repeated same-record reads,
-* one-off scans are filling caches intentionally meant for repeated reads,
+* mutable-segment Bloom filtering is disabled or has a high false-positive rate,
+* materialized-entry chunks have little reuse,
+* sequential search hints do not match the actual access order,
+* iterator prefetch is too small or too large for the range shape,
 * compression block size is too large for random reads.
 
 First actions:
@@ -89,11 +94,13 @@ First actions:
 * keep maintenance healthy,
 * design keys around range scans and locality,
 * tune `DefaultSparseArrayStepSize` after measuring seeks and point reads,
+* verify the comparer and hasher contract before interpreting Bloom behavior,
 * tune `BlockCacheLifeTime` for repeated nearby disk reads,
-* keep one-off full scans from contributing to the block cache,
+* benchmark `MaterializedEntryCacheSize` and `SearchHintPrefetchSize` separately,
+* benchmark iterator prefetch with the real query limit,
 * review disk compression block size for random-read workloads.
 
-See [read-path caching](../storage/read-path-caching.md), [key ordering](../concepts/key-ordering.md), and [disk segment tuning](../tuning/disk-segments.md).
+See [read-path caching](../tuning/read-path-caching.md), [key ordering](../concepts/key-ordering.md), and [disk segment tuning](../tuning/disk-segments.md).
 
 ## Process Memory Looks High
 
@@ -106,6 +113,10 @@ Likely ZoneTree contributors:
 * large keys or values,
 * decompressed disk block cache,
 * circular key/value caches,
+* mutable-segment Bloom filters,
+* materialized key/value chunks attached to decompressed blocks,
+* thread-local search-hint buffers,
+* iterator prefetch buffers,
 * long-lived iterators,
 * temporary merge and WAL buffers.
 

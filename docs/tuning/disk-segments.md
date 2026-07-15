@@ -1,96 +1,88 @@
 # Disk Segment Tuning
 
-Disk segment tuning controls the long-term shape of persistent data.
+Disk-segment options control persistent file shape, search cost, decompression,
+and the memory retained for disk reads. Start from defaults and change one
+dimension at a time against a representative workload.
 
-## Start With The Workload
+## Segment Mode And Part Size
 
-Before tuning, identify whether the workload is dominated by:
+`MultiPartDiskSegment` is the default. It divides large persistent segments
+into reusable range parts, limiting how much unchanged data a localized merge
+must rewrite.
 
-* point reads,
-* range scans,
-* large sequential scans,
-* heavy writes,
-* deletes/TTL,
-* large values,
-* backup/restore constraints,
-* file-size limits.
+`MinimumRecordCount` and `MaximumRecordCount` default to `1_500_000` and
+`3_000_000`. ZoneTree randomizes new part targets inside that range to avoid
+rigid fully packed boundaries. Existing small parts may be merged rather than
+reused to prevent fragmentation.
 
-## Disk Segment Mode
+Larger parts reduce file count and transitions during scans. Smaller parts can
+improve localized reuse but increase file count, metadata, backup work, and
+iterator transitions.
 
-`MultiPartDiskSegment` is the default and is usually the right choice for large datasets. It partitions large disk segments into parts and helps keep very large storage shapes manageable.
+`DiskSegmentMaxItemCount` is a higher-level threshold and defaults to
+`20_000_000` records.
 
-`SingleDiskSegment` can be appropriate for smaller databases where one segment file is easier to manage.
+## Compression
 
-```csharp
-using ZoneTree.Options;
+Disk segments default to Zstd level `0` with `4 MB` compression blocks.
 
-using var zoneTree = new ZoneTreeFactory<int, string>()
-    .SetDataDirectory("data/app")
-    .ConfigureDiskSegmentOptions(options =>
-    {
-        options.DiskSegmentMode = DiskSegmentMode.MultiPartDiskSegment;
-    })
-    .OpenOrCreate();
-```
+Larger blocks can improve compression ratio and sequential throughput. Smaller
+blocks reduce the bytes read, decompressed, and retained for random access. The
+validated block-size range is `1 MB` through `64 MB` unless unsafe option values
+are explicitly allowed.
 
-## Minimum And Maximum Record Count
+## Sparse Index
 
-For multipart disk segments:
+`DefaultSparseArrayStepSize` defaults to `1024` records.
 
-* `MinimumRecordCount` controls the lower target size for a part,
-* `MaximumRecordCount` controls the upper target size for a part.
-
-The defaults are `1_500_000` and `3_000_000` records. The higher-level `DiskSegmentMaxItemCount` default is `20_000_000` records.
-
-Larger parts mean fewer files and potentially better sequential behavior. Smaller parts can reduce operational file-size pressure and make part-level reuse more flexible.
-
-ZoneTree randomizes multipart part sizes between the configured minimum and maximum. This avoids rigid split boundaries and helps multipart merge reuse stay effective over time. See [write amplification](write-amplification.md).
-
-## Sparse Array Step Size
-
-`DefaultSparseArrayStepSize` controls how frequently ZoneTree records sparse index entries while creating disk segments.
-
-Trade-off:
-
-| Step size | Effect |
+| Value | Tradeoff |
 | --- | --- |
-| Smaller | more sparse entries, more memory, faster positioning |
-| Larger | fewer sparse entries, less memory, more local search |
-| `0` | disables default sparse array creation/loading |
+| smaller positive value | more sparse entries and memory, narrower local search |
+| larger value | fewer entries and less memory, wider local search |
+| `0` | disable default sparse-array creation and loading |
 
-Use a lower step size when point lookups and seeks dominate. Use a higher step size when memory pressure matters more.
+The right density depends on key comparison, storage latency, block size, and
+whether reads are random, clustered, or sequential.
 
-The default step size is `1024`.
+## Materialized Entries
 
-```csharp
-using var zoneTree = new ZoneTreeFactory<int, string>()
-    .SetDataDirectory("data/app")
-    .ConfigureDiskSegmentOptions(options =>
-    {
-        options.DefaultSparseArrayStepSize = 512;
-    })
-    .OpenOrCreate();
-```
+`MaterializedEntryCacheSize` defaults to 4096 aligned chunk slots per
+decompressed block. Each chunk holds up to 16 deserialized key/value pairs.
 
-## Fixed-Size Layouts
+Increase it only when repeated or overlapping batched reads benefit from
+deserialization reuse and memory remains acceptable. Reduce it for large
+reference-type values or a broad hot-block working set. Set it to `0` to
+disable materialized-entry caching.
 
-When keys and values are small unmanaged structs, ZoneTree can use fixed-size disk segment layouts. This can reduce metadata overhead and simplify disk access.
+Because chunks are index-aligned, iterator prefetch sizes do not have to be
+multiples of 16. Requests smaller than 16 can fill part of a chunk; later reads
+can complete and reuse it.
 
-For variable-length values such as strings and byte arrays, ZoneTree uses layouts with offsets and headers.
+## Sequential Point Reads
 
-## Compression Block Size
+`SearchHintPrefetchSize` defaults to `16`. It accelerates consecutive ascending
+or descending `TryGet` calls by reading adjacent entries after a sequential
+pattern is detected.
 
-`CompressionBlockSize` affects disk compression and random-access behavior.
+Use a small value for short ranges or frequent direction changes. Larger values
+can help sustained streams but retain larger buffers per calling thread and
+disk segment. Set `0` to disable search hints.
 
-The default disk compression block size is `4 MB`, using Zstd level `0` compression.
+This option is independent of `IteratorOptions.DiskSegmentPrefetchSize`, which
+controls batching inside explicit iterators.
 
-Larger blocks often compress better but can make small random reads more expensive. Smaller blocks can improve random read granularity but may reduce compression ratio.
+## Circular Record Caches
 
-## Cache Settings
+`KeyCacheSize` and `ValueCacheSize` default to `1024`; lifetimes default to ten
+seconds. They target repeated reads of individual disk record positions.
 
-Disk reads are mostly shaped by the decompressed block cache. Disk segments are compressed in blocks by default, and repeated reads can reuse decompressed blocks.
+The sizes can be any non-negative values. Set a size to `0` to disable that
+cache. Increase them only when a stable repeated-record working set produces a
+measured gain.
 
-Block cache cleanup is controlled by the maintainer:
+## Decompressed Block Lifetime
+
+Block lifetime belongs to the maintainer rather than `DiskSegmentOptions`:
 
 ```csharp
 using var maintainer = zoneTree.CreateMaintainer();
@@ -99,38 +91,27 @@ maintainer.BlockCacheLifeTime = TimeSpan.FromMinutes(2);
 maintainer.InactiveBlockCacheCleanupInterval = TimeSpan.FromSeconds(30);
 ```
 
-Circular key/value caches are a smaller per-record layer:
+A longer lifetime helps repeated nearby reads but retains blocks and their
+materialized entries longer.
 
-* `KeyCacheSize`
-* `ValueCacheSize`
-* key/value cache lifetimes
-
-The default key and value cache sizes are `1024` records each, with `10 second` record lifetimes. Increase them when the same disk record indexes are read repeatedly.
+## Example Profile
 
 ```csharp
-using var zoneTree = new ZoneTreeFactory<int, string>()
-    .SetDataDirectory("data/app")
+using ZoneTree.Options;
+
+using var zoneTree = new ZoneTreeFactory<long, string>()
     .ConfigureDiskSegmentOptions(options =>
     {
-        options.KeyCacheSize = 4096;
-        options.ValueCacheSize = 4096;
-        options.KeyCacheRecordLifeTimeInMillisecond = 30_000;
-        options.ValueCacheRecordLifeTimeInMillisecond = 30_000;
+        options.DiskSegmentMode = DiskSegmentMode.MultiPartDiskSegment;
+        options.DefaultSparseArrayStepSize = 1024;
+        options.MaterializedEntryCacheSize = 4096;
+        options.SearchHintPrefetchSize = 16;
+        options.KeyCacheSize = 1024;
+        options.ValueCacheSize = 1024;
     })
     .OpenOrCreate();
 ```
 
-Iterator scans do not contribute to the shared block cache by default. Enable iterator cache contribution only when the scan represents a useful working set.
-
-See [read-path caching](../storage/read-path-caching.md).
-
-## Practical Defaults
-
-Default disk segment settings are designed to be reasonable for general workloads. Tune only after you know what is limiting the system:
-
-* memory,
-* disk IO,
-* file count,
-* merge duration,
-* read latency,
-* backup/restore time.
+See [read-path caching](read-path-caching.md),
+[memory usage](../storage/memory-usage.md), and
+[write amplification](write-amplification.md).

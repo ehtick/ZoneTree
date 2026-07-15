@@ -1,8 +1,6 @@
-# ZoneTree Docs
+# ZoneTree Documentation
 
 ZoneTree is a high-performance LSM-tree storage engine for .NET. It provides ordered, persistent key-value storage that can be used directly or as the foundation for databases, indexes, queues, search systems, event stores, and custom data platforms.
-
-These docs explain the mental model behind ZoneTree, the main APIs, and the operational choices that matter in production.
 
 ## Core Strengths
 
@@ -14,33 +12,32 @@ ZoneTree is strongest when it is treated as a storage-engine foundation: an orde
 * Operation indexes provide a producer write sequence for replay, audit, restore, and replication pipelines.
 * Iterators, live backup, restore, transactions, and maintenance hooks make ZoneTree useful as a building block for larger data systems.
 
-For the storage model, start with [LSM Tree](concepts/lsm-tree.md). For ZoneTree's merge design, read [Write amplification](tuning/write-amplification.md).
+## Start Here
 
-## Start here
+1. [Open a tree and run maintenance](getting-started.md).
+2. Learn the [LSM-tree and segment model](concepts/lsm-tree.md).
+3. Choose the right [read and write APIs](usage/reads-and-writes.md).
+4. Design keys for [ordering and range scans](concepts/key-ordering.md).
+5. Select a [WAL durability mode](durability/wal-modes.md).
+6. Complete the [production checklist](operations/production-checklist.md).
 
-* [Getting started](getting-started.md)
-* [LSM Tree](concepts/lsm-tree.md)
-* [Reads and writes](usage/reads-and-writes.md)
-* [Value mutability](concepts/value-mutability.md)
-* [Iteration and range scans](usage/iteration-and-range-scans.md)
-* [Maintenance](usage/maintenance.md)
+## Core Capabilities
 
-## Concepts
+* Ordered keys, forward and reverse iterators, seeks, and range scans
+* Concurrent individual writes and atomic same-key read-modify-write operations
+* Optimistic multi-key transactions
+* Write-ahead logging, compressed disk segments, recovery, and live backup
+* Custom serializers, comparers, key hashers, and storage providers
+* Mutable-segment Bloom filtering and layered disk-read caching
+* Multipart disk segments designed to limit persistent rewrite amplification
 
-* [LSM Tree](concepts/lsm-tree.md)
-* [Segments](concepts/segments.md)
-* [Key ordering](concepts/key-ordering.md)
-* [Deletion markers and TTL](concepts/deletion-markers-and-ttl.md)
-* [Operation indexes](concepts/op-index.md)
-* [Value mutability](concepts/value-mutability.md)
-
-## Usage
+## Use ZoneTree
 
 * [Opening a tree](usage/opening-a-tree.md)
 * [Reads and writes](usage/reads-and-writes.md)
-* [Iteration and range scans](usage/iteration-and-range-scans.md)
 * [Atomic operations](usage/atomic-operations.md)
 * [Transactions](usage/transactions.md)
+* [Iteration and range scans](usage/iteration-and-range-scans.md)
 * [Maintenance](usage/maintenance.md)
 
 ## Durability
@@ -49,24 +46,31 @@ For the storage model, start with [LSM Tree](concepts/lsm-tree.md). For ZoneTree
 * [Recovery](durability/recovery.md)
 * [Backups](durability/backups.md)
 
-## Storage
+## Concepts And Storage
 
-* [Memory usage](storage/memory-usage.md)
+* [Segments](concepts/segments.md)
+* [Bloom filters](concepts/bloom-filters.md)
+* [Key ordering](concepts/key-ordering.md)
+* [Key components](concepts/serializers-and-comparers.md)
+* [Deletion markers and TTL](concepts/deletion-markers-and-ttl.md)
+* [Operation indexes](concepts/op-index.md)
+* [Value mutability](concepts/value-mutability.md)
 * [Disk segments](storage/disk-segments.md)
 * [File stream providers](storage/file-stream-providers.md)
-* [Read-path caching](storage/read-path-caching.md)
+* [Memory usage](storage/memory-usage.md)
 * [Compression](storage/compression.md)
-* [Serializers and comparers](storage/serializers-and-comparers.md)
 
-## Benchmarks
+## Operate And Tune
 
-* [Profile store benchmark](benchmark/benchmark.md)
-
-## Tuning
-
+* [Configuration reference](reference/configuration.md)
+* [Read-path caching](tuning/read-path-caching.md)
+* [Disk-segment tuning](tuning/disk-segments.md)
 * [Write amplification](tuning/write-amplification.md)
-* [Disk segment tuning](tuning/disk-segments.md)
 * [Large values](tuning/large-values.md)
+* [Diagnostics](operations/diagnostics.md)
+* [Troubleshooting](operations/troubleshooting.md)
+* [Benchmark methodology](benchmark/benchmark.md)
+* [API overview](reference/api-overview.md)
 
 ## Build On ZoneTree
 
@@ -76,13 +80,7 @@ For the storage model, start with [LSM Tree](concepts/lsm-tree.md). For ZoneTree
 * [Time-series storage](building-systems/time-series.md)
 * [Partitioning and replication](building-systems/partitioning-and-replication.md)
 
-## Operations
-
-* [Production checklist](operations/production-checklist.md)
-* [Troubleshooting](operations/troubleshooting.md)
-* [Diagnostics](operations/diagnostics.md)
-
-## Reference
-
-* [Configuration](reference/configuration.md)
-* [API overview](reference/api-overview.md)
+ZoneTree exposes storage-engine building blocks rather than prescribing an
+application model. The engine owns ordered persistence and lifecycle safety;
+the application owns its key layout, indexes, transaction boundaries,
+durability requirements, and operational policy.

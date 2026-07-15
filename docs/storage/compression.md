@@ -68,7 +68,7 @@ Block cache cleanup is controlled by the maintainer:
 * `BlockCacheLifeTime`
 * `InactiveBlockCacheCleanupInterval`
 
-See [read path caching](read-path-caching.md).
+See [read path caching](../tuning/read-path-caching.md).
 
 ## Why WAL And Disk Defaults Differ
 

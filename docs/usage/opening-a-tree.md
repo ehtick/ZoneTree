@@ -62,9 +62,13 @@ using var zoneTree = new ZoneTreeFactory<int, string>()
     .OpenOrCreate();
 ```
 
+ZoneTree fills serializers, comparers, and hashers for supported known types.
+When supplying a custom comparer, ensure comparer-equal keys produce the same
+hash.
+
 ## Dispose
 
-Always dispose ZoneTree instances when the application is done with them.
+Always dispose ZoneTree instances when they are no longer needed.
 
 ```csharp
 using var zoneTree = new ZoneTreeFactory<int, string>()

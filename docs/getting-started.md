@@ -1,6 +1,7 @@
 # Getting Started
 
-This guide opens a persistent ZoneTree, writes a record, reads it back, and creates an iterator.
+This guide creates a persistent ZoneTree, writes and reads a record, and scans
+an ordered key range.
 
 ## Install
 
@@ -16,56 +17,57 @@ using ZoneTree;
 using var zoneTree = new ZoneTreeFactory<int, string>()
     .SetDataDirectory("data/my-zone-tree")
     .OpenOrCreate();
+
+using var maintainer = zoneTree.CreateMaintainer();
 ```
 
-`SetDataDirectory` controls where ZoneTree stores its metadata, WAL files, and disk segments unless more specific directories/providers are configured.
+`OpenOrCreate()` opens the existing tree in `data/my-zone-tree`, or creates it
+when it does not exist.
+
+`CreateMaintainer()` creates ZoneTree's ready-to-use background maintenance
+worker and automates merge scheduling and inactive-cache cleanup. Creating a
+maintainer is optional; without one, those jobs do not run automatically.
 
 ## Write And Read
 
 ```csharp
-var opIndex = zoneTree.Upsert(1, "Hello ZoneTree");
+zoneTree.Upsert(1, "Hello ZoneTree");
 
 if (zoneTree.TryGet(1, out var value))
-{
     Console.WriteLine(value);
-}
 ```
 
-`Upsert` is the normal high-throughput write path. It adds or replaces a value and returns an operation index for the write.
+`Upsert` inserts a new key or replaces the current value. `TryGet` returns the
+newest live value for the key.
 
-## Iterate In Key Order
+## Scan An Ordered Range
 
 ```csharp
 using var iterator = zoneTree.CreateIterator();
 
-iterator.Seek(1);
-
-while (iterator.Next())
-{
+iterator.Seek(100);
+while (iterator.Next() && iterator.CurrentKey < 200)
     Console.WriteLine($"{iterator.CurrentKey}: {iterator.CurrentValue}");
-}
 ```
 
-ZoneTree stores keys in comparer order. That makes range scans, prefix layouts, secondary indexes, time-series layouts, and ordered queues natural to build.
+A forward iterator returns keys in comparer order. `Seek(100)` positions it so
+the next successful `Next()` returns the first key greater than or equal to
+`100`.
 
-## Run Maintenance
+Dispose iterators when the scan is complete.
 
-ZoneTree uses an LSM-tree architecture. Writes first enter an in-memory mutable segment. Maintenance moves data forward and merges persistent segments.
+## Shutdown
 
-```csharp
-using var maintainer = zoneTree.CreateMaintainer();
-
-zoneTree.Upsert(2, "value");
-
-maintainer.WaitForBackgroundThreads();
-```
-
-For long-running applications, keep a maintainer alive while the tree is active.
+The tree, maintainer, and iterators are disposable. The `using` declarations in
+the examples dispose them when their scopes end. Maintainer disposal waits for
+its tracked merge threads to finish. See [maintenance](usage/maintenance.md)
+when you need to configure maintenance or observe merge completion explicitly.
 
 ## Next Steps
 
-* Learn the [LSM tree](concepts/lsm-tree.md).
-* Choose the right [read and write API](usage/reads-and-writes.md).
-* Understand [value mutability](concepts/value-mutability.md).
-* Understand [memory usage](storage/memory-usage.md).
-* Pick a [WAL mode](durability/wal-modes.md).
+* [Opening and configuring a tree](usage/opening-a-tree.md)
+* [Reads and writes](usage/reads-and-writes.md)
+* [Iteration and range scans](usage/iteration-and-range-scans.md)
+* [Maintenance](usage/maintenance.md)
+* [WAL modes](durability/wal-modes.md)
+* [Production checklist](operations/production-checklist.md)

@@ -1,6 +1,7 @@
 # Iteration And Range Scans
 
-ZoneTree stores keys in order. Iterators expose that order for full scans, range scans, prefix layouts, and reverse reads.
+ZoneTree stores keys in comparer order. Iterators expose that order for full
+scans, range scans, prefix layouts, and reverse reads.
 
 ## Forward Iteration
 
@@ -15,7 +16,11 @@ while (iterator.Next())
 
 ## Seek
 
-Use `Seek` to move near a key and continue from there. A forward iterator seeks to the first key greater than or equal to the target key.
+Use `Seek` to position a forward iterator at the target when it exists, or at
+the following key in configured comparer order when it does not.
+
+With an ascending integer comparer, this example scans the half-open range
+`[100, 200)`:
 
 ```csharp
 using var iterator = zoneTree.CreateIterator();
@@ -27,11 +32,29 @@ while (iterator.Next())
     if (iterator.CurrentKey >= 200)
         break;
 
-    Console.WriteLine(iterator.CurrentValue);
+    Console.WriteLine($"{iterator.CurrentKey}: {iterator.CurrentValue}");
 }
 ```
 
+The range boundaries follow the configured comparer. For structured keys, use
+lower and upper keys that represent the intended range in that ordering.
+
 ## Reverse Iteration
+
+Create a reverse iterator to scan the configured comparer order backward:
+
+```csharp
+using var iterator = zoneTree.CreateReverseIterator();
+
+while (iterator.Next())
+{
+    Console.WriteLine($"{iterator.CurrentKey}: {iterator.CurrentValue}");
+}
+```
+
+Use `Seek` to position a reverse iterator at the target when it exists, or at
+the preceding key in configured comparer order when it does not. With an
+ascending integer comparer, this example scans from `1000` down through `900`:
 
 ```csharp
 using var iterator = zoneTree.CreateReverseIterator();
@@ -40,32 +63,42 @@ iterator.Seek(1000);
 
 while (iterator.Next())
 {
+    if (iterator.CurrentKey < 900)
+        break;
+
     Console.WriteLine($"{iterator.CurrentKey}: {iterator.CurrentValue}");
 }
 ```
 
-Reverse iteration is useful for latest-first time-series queries, descending indexes, and scanning high-key ranges. A reverse iterator seeks to the last key smaller than or equal to the target key.
+Reverse iteration is useful for latest-first time-series queries, descending
+indexes, and high-key ranges.
 
 ## Iterator Types
 
-ZoneTree iterators can operate with different refresh behavior.
+ZoneTree iterators support different refresh and visibility behavior.
 
 | Type | Behavior |
 | --- | --- |
-| `IteratorType.AutoRefresh` | Default. Scans all available segments and refreshes when the mutable segment moves forward. New writes may appear if their position has not already been passed. |
-| `IteratorType.NoRefresh` | Scans all available segments captured by the iterator and does not automatically include newly moved segments. It can be manually refreshed. |
-| `IteratorType.Snapshot` | Moves the mutable segment forward when the iterator is created, then scans read-only, disk, and bottom segments. It does not see later writes. |
-| `IteratorType.ReadOnlyRegion` | Like snapshot, but does not move the mutable segment forward. Manually move the mutable segment first if you need current in-memory writes included. |
+| `AutoRefresh` | Default. Scans all available segments and refreshes when the mutable segment moves forward. Later writes may appear if their key position has not already been passed. |
+| `NoRefresh` | Does not automatically include segments created by a later mutable-segment move. It still includes the current mutable segment and may observe later writes whose key position has not been passed. Call `Refresh()` to collect the latest segments manually. |
+| `Snapshot` | Moves the mutable segment forward when the iterator is created, then scans the resulting read-only region and persistent segments. It does not see later writes. |
+| `ReadOnlyRegion` | Like `Snapshot`, but does not move the mutable segment forward. It scans only data already in the read-only region and persistent segments. |
 
-Use the default iterator for ordinary scans. Use `Snapshot` when you need a stable view and can accept the cost of moving the mutable segment forward.
+Use the default iterator for ordinary scans. Use `Snapshot` when the scan needs
+a stable view containing all writes visible when the iterator is created:
 
 ```csharp
 using var iterator = zoneTree.CreateIterator(IteratorType.Snapshot);
 ```
 
+Use `ReadOnlyRegion` when the scan should exclude records still in the active
+mutable segment and creating the iterator must not move that segment forward.
+
 ## Deleted Records
 
-By default, iterators return live records. Pass `includeDeletedRecords: true` when you need low-level inspection, diagnostics, or custom compaction workflows.
+By default, iterators return live records and hide deletion markers. Include
+deleted records for inspection, diagnostics, backup, restore, or
+replication workflows:
 
 ```csharp
 using var iterator = zoneTree.CreateIterator(
@@ -73,11 +106,14 @@ using var iterator = zoneTree.CreateIterator(
     includeDeletedRecords: true);
 ```
 
-Normal application scans should usually leave deleted records hidden.
-
 ## Block Cache Contribution
 
-Disk segment iterator reads do not contribute to the block cache by default. Enable cache contribution when the scan represents a useful working set that is likely to be read again.
+Disk-segment iterator reads do not contribute to the block cache by default.
+This avoids retaining the decompressed blocks touched by a scan after the
+iterator moves on.
+
+Enable cache contribution explicitly when the iterator should add decompressed
+blocks to the shared block cache:
 
 ```csharp
 using var iterator = zoneTree.CreateIterator(
@@ -86,18 +122,37 @@ using var iterator = zoneTree.CreateIterator(
     contributeToTheBlockCache: true);
 ```
 
-For one-off full scans, keep cache contribution disabled so the scan does not evict hotter random-read data.
+Contributing retains the scanned blocks in memory until inactive block-cache
+cleanup releases them.
 
-## Low-Level Segment Iterators
+## Disk Segment Prefetch
 
-The implementation also exposes low-level in-memory and read-only-segment iterators. These are useful for diagnostics and internal tooling, not normal application reads.
+`DiskSegmentPrefetchSize` controls how many consecutive disk records an
+iterator may read as one batch. The default is `0`; values below `2` disable
+prefetching.
+
+```csharp
+using var iterator = zoneTree.CreateIterator(new IteratorOptions
+{
+    IteratorType = IteratorType.AutoRefresh,
+    DiskSegmentPrefetchSize = 16
+});
+```
+
+Prefetching can reduce per-record overhead during disk scans and may read beyond
+an early range termination.
 
 ## Dispose Iterators
 
-Iterators can hold references to segments while they scan. Dispose them when you are done.
+Iterators retain the segments they scan. Always dispose an iterator when its
+scan is complete:
 
 ```csharp
 using var iterator = zoneTree.CreateIterator();
 ```
 
-Long-lived iterators can delay segment disposal, so keep them scoped to the scan.
+Long-lived iterators can delay physical deletion of segments replaced by a
+merge. Keep each iterator scoped to the scan that uses it.
+
+See [read-path caching](../tuning/read-path-caching.md) for prefetch and block
+cache tuning.

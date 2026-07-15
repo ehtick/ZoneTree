@@ -1,50 +1,77 @@
 # Memory Usage
 
-ZoneTree is designed for datasets larger than memory. It does not need to load the whole database into RAM.
+ZoneTree does not load the entire database into RAM. Its live memory is shaped
+by the active write set, pending maintenance, read caches, iterator lifetimes,
+and the application's key/value objects.
 
-## Where Memory Goes
+## Main Consumers
 
-Memory usage mainly comes from:
-
-* active mutable segment,
+* active mutable-segment B+Tree and Bloom filter,
 * frozen in-memory segments waiting for merge,
-* disk block cache,
-* sparse indexes,
-* iterators that pin active segments,
-* merge buffers,
-* WAL processing buffers,
-* user key/value objects.
+* sparse disk indexes,
+* decompressed disk blocks,
+* materialized 16-entry key/value chunks,
+* circular per-record key/value caches,
+* thread-local sequential search-hint buffers,
+* iterator prefetch buffers and segment leases,
+* merge, compression, and WAL buffers,
+* user key/value objects retained by in-memory segments.
 
-Small immutable structs can reduce GC pressure for in-memory values. Mutable reference types can create correctness problems if they are mutated after insertion, so treat stored values as immutable snapshots.
+## Mutable Segment
 
-See [value mutability](../concepts/value-mutability.md).
-
-## Mutable Segment Size
-
-The most important write-side memory control is `MutableSegmentMaxItemCount`.
-
-By default, ZoneTree starts moving a mutable segment toward disk after `1_000_000` records. This is a good default for small keys and values. For large strings, documents, or payload objects, lower the limit because record count and byte size are very different things.
+`MutableSegmentMaxItemCount` defaults to `1_000_000`. It is a record limit, not
+a byte budget. A million compact structs and a million documents have very
+different memory footprints.
 
 ```csharp
 using var zoneTree = new ZoneTreeFactory<int, string>()
-    .SetDataDirectory("data/app")
-    .SetMutableSegmentMaxItemCount(10_000)
+    .SetMutableSegmentMaxItemCount(100_000)
     .OpenOrCreate();
 ```
 
-## .NET GC Behavior
+The Bloom filter requests `MutableSegmentBloomFilterBitsPerItem` times the
+configured mutable-segment capacity, rounds the result up to a power of two,
+and caps it at `2^30` bits. The default request is `8` bits per item. The filter
+uses a managed `long[]`, so include array overhead and power-of-two rounding in
+capacity estimates.
 
-ZoneTree is built as a native .NET storage engine and uses the .NET garbage collector as part of its design. The GC is highly optimized for modern application workloads and helps keep ZoneTree simple, safe, and fast without requiring manual memory management.
+Read-only in-memory segments retain their completed Bloom filters and records
+until maintenance merges them. A backlog multiplies both record and filter
+memory.
 
-When observing memory usage, remember that .NET may keep freed memory available for reuse instead of returning it to the operating system immediately. Process memory can remain high even after segments are merged or released.
+## Disk Read Memory
 
-Use .NET memory diagnostics when you need to measure live ZoneTree data precisely.
+The decompressed-block cache is usually the largest read-side consumer. A
+cached block retains its decompressed bytes and any materialized-entry cache
+attached to it.
 
-## Read-Heavy Workloads
+`MaterializedEntryCacheSize` defaults to 4096 chunk slots per block. Each
+published chunk owns arrays for 16 keys and 16 values. The maximum number of
+resident chunks is bounded, but actual byte cost depends strongly on `TKey`,
+`TValue`, block contents, collisions, and how many positions have been read.
 
-For read-heavy workloads, memory is mostly shaped by cache behavior and the active working set.
+Circular key and value caches are bounded per disk segment. Search-hint buffers
+are allocated lazily per disk segment and calling thread, so many threads
+touching many segments can create a larger footprint than the prefetch number
+alone suggests.
 
-The largest read-side cache is usually the decompressed disk block cache. It stores decompressed compression blocks for disk segments and is cleaned by the maintainer. The default maintainer settings keep inactive blocks for `1 minute` and run cleanup every `30 seconds`.
+See [read-path caching](../tuning/read-path-caching.md) for ownership and disable options.
+
+## Iterators
+
+Each low-level disk iterator can allocate prefetch arrays according to
+`IteratorOptions.DiskSegmentPrefetchSize`. A ZoneTree iterator may merge several
+segment iterators, so total buffer memory depends on the number of active
+segments as well as the configured prefetch size.
+
+Iterators also lease the segments they scan. A long-lived iterator can keep a
+retired segment and its caches reachable until disposal.
+
+## Maintainer Cleanup
+
+A maintainer automates merge and inactive-cache cleanup work according to
+configurable policies. For custom control, `zoneTree.Maintenance` exposes
+maintenance state, events, and operations.
 
 ```csharp
 using var maintainer = zoneTree.CreateMaintainer();
@@ -53,8 +80,22 @@ maintainer.BlockCacheLifeTime = TimeSpan.FromMinutes(1);
 maintainer.InactiveBlockCacheCleanupInterval = TimeSpan.FromSeconds(30);
 ```
 
-Circular key/value caches are smaller per-record caches configured through disk segment options. They are useful for repeated reads of the same disk record indexes, but they are not the main disk-read cache.
+Shorter block lifetime lowers retained read memory but can increase I/O and
+decompression. It does not override a block currently pinned by a read.
 
-## Write-Heavy Workloads
+## .NET Process Memory
 
-For write-heavy workloads, memory is mostly shaped by mutable segment size and how quickly maintenance can move frozen segments to disk.
+The .NET runtime may keep previously used memory reserved for reuse. Process
+working set and peak memory therefore do not directly equal live ZoneTree
+objects. Use managed heap diagnostics, allocation profiles, and retained-object
+analysis together with process counters.
+
+## Capacity Checklist
+
+* Estimate bytes per mutable record, not only record count.
+* Include every simultaneously frozen segment during a maintenance backlog.
+* Include Bloom-filter power-of-two rounding.
+* Multiply disk caches by the number of active disk segments and hot blocks.
+* Multiply search hints by active threads and touched disk segments.
+* Multiply iterator buffers by active iterators and their segment fan-in.
+* Measure after warmup and after inactive-cache cleanup.
