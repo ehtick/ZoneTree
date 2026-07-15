@@ -290,6 +290,7 @@ public sealed class ZoneTreeMaintainer<TKey, TValue> : IMaintainer, IDisposable
   /// </summary>
   public void Dispose()
   {
+    WaitForBackgroundThreads();
     PeriodicTimerCancellationTokenSource.Cancel();
     PeriodicTimerCancellationTokenSource.Dispose();
     Maintenance.OnMutableSegmentMovedForward -= OnMutableSegmentMovedForward;
