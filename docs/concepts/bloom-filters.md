@@ -1,4 +1,4 @@
-# Mutable-Segment Bloom Filters
+# Bloom Filters
 
 ZoneTree uses Bloom filters to avoid unnecessary lookups in mutable segments.
 When a key is definitely absent, ZoneTree skips that segment's B+Tree lookup.
