@@ -1,0 +1,6 @@
+data/
+data-*/
+results/
+results-*/
+build-check/
+traces/

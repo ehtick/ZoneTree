@@ -1,7 +1,6 @@
 {
   "mode": "merge",
   "sequence": [
-    "benchmark",
     "100k-p1/",
     "100k-p16/",
     "500k-p1/",
