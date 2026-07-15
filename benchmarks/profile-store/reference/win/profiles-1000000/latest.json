@@ -1,0 +1,465 @@
+[
+  {
+    "Engine": "ZoneTree",
+    "Durability": "AsyncCompressed WAL default; MutableSegmentMaxItemCount=250000; SparseArrayStepSize=16; KeyCacheSize=1024; ValueCacheSize=1024; IteratorPrefetchSize=16; BlockCacheLifeTime=1 minutes; application-managed secondary indexes; background maintainers enabled.",
+    "StartedAtUtc": "2026-07-15T04:59:48.8513600Z",
+    "Workload": {
+      "Profiles": 1000000,
+      "Parallelism": 1,
+      "ReadCount": 1000000,
+      "EmailReadCount": 1000000,
+      "QueryCount": 250000,
+      "UpdateCount": 1000000,
+      "PostReadCount": 1000000,
+      "PostEmailReadCount": 1000000,
+      "PostQueryCount": 250000,
+      "QueryLimit": 50,
+      "Seed": 570123434,
+      "TimeoutSeconds": 120000
+    },
+    "EngineSettings": {
+      "MutableSegmentMaxItemCount": "250000",
+      "SparseArrayStepSize": "16",
+      "KeyCacheSize": "1024",
+      "ValueCacheSize": "1024",
+      "IteratorPrefetchSize": "16",
+      "BlockCacheLifeTime": "1 minutes",
+      "BottomMergePolicy": "Full bottom merge when bottom segment count exceeds 1",
+      "ReadStabilization": "Settle before read/query phases"
+    },
+    "Completed": true,
+    "Status": "Completed",
+    "Phases": [
+      {
+        "Name": "insert profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 3901.2545,
+        "OperationsPerSecond": 256327.8042998733,
+        "Checksum": "70EEB1E90366F6E5"
+      },
+      {
+        "Name": "read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 1041.6839,
+        "OperationsPerSecond": 959984.1180227514,
+        "Checksum": "0FB577C390019AC8"
+      },
+      {
+        "Name": "lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 2374.5383,
+        "OperationsPerSecond": 421134.5001257718,
+        "Checksum": "9C199CC596F7AC10"
+      },
+      {
+        "Name": "scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 1025.208,
+        "OperationsPerSecond": 243852.95471748174,
+        "Checksum": "61A2EA3E2821B78E"
+      },
+      {
+        "Name": "query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 7674.5595,
+        "OperationsPerSecond": 32575.15952544247,
+        "Checksum": "59430B6E3710B73A"
+      },
+      {
+        "Name": "scan created-at index",
+        "Operations": 250000,
+        "ElapsedMs": 1295.674,
+        "OperationsPerSecond": 192949.76977233472,
+        "Checksum": "5DCF6A52134EE2E1"
+      },
+      {
+        "Name": "query created-at range",
+        "Operations": 250000,
+        "ElapsedMs": 6019.9426,
+        "OperationsPerSecond": 41528.63517336527,
+        "Checksum": "F7273374D314AB37"
+      },
+      {
+        "Name": "scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 806.2761,
+        "OperationsPerSecond": 310067.4818464791,
+        "Checksum": "29FF27B972C9DD05"
+      },
+      {
+        "Name": "query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 5024.0554,
+        "OperationsPerSecond": 49760.59778321712,
+        "Checksum": "BF3EF75489BD5D95"
+      },
+      {
+        "Name": "update profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 6653.6769,
+        "OperationsPerSecond": 150292.84033915144,
+        "Checksum": "2440ADD57E65500B"
+      },
+      {
+        "Name": "post-update read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 1066.183,
+        "OperationsPerSecond": 937925.2904989105,
+        "Checksum": "7DB9AA24CC9A8B8E"
+      },
+      {
+        "Name": "post-update lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 2428.819,
+        "OperationsPerSecond": 411722.7343824303,
+        "Checksum": "43569B6DA38ACCB5"
+      },
+      {
+        "Name": "post-update scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 1021.2468,
+        "OperationsPerSecond": 244798.8086719097,
+        "Checksum": "E81A287B61AC0B4A"
+      },
+      {
+        "Name": "post-update query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 8089.6422,
+        "OperationsPerSecond": 30903.71537074903,
+        "Checksum": "187087226FE86156"
+      },
+      {
+        "Name": "post-update scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 845.2355,
+        "OperationsPerSecond": 295775.5560432566,
+        "Checksum": "2FCAC43A8D128B85"
+      },
+      {
+        "Name": "post-update query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 5452.6682,
+        "OperationsPerSecond": 45849.11291686518,
+        "Checksum": "A983697B4465FA75"
+      }
+    ],
+    "RunElapsedMs": 58220.4213,
+    "PreReadStabilizeMs": 1230.9827,
+    "PostUpdateStabilizeMs": 1539.3088,
+    "SettleMs": 15.8678,
+    "StorageSizeBytes": 77005826,
+    "ReopenMs": 113.0047,
+    "VerifyMs": 11.808,
+    "VerifyChecksum": "B7578931045C8FC5",
+    "PeakProcessWorkingSetBytes": 1782685696,
+    "Environment": "* OS: Microsoft Windows 10.0.26200\r\n* Architecture: X64\r\n* .NET: 10.0.6\r\n* CPU: Intel(R) Core(TM) Ultra 7 265KF\r\n* Logical processors: 20\r\n* Total available memory: 63.6 GB\r\n* Initial process working set: 141.2 MB\r\n* Benchmark version: 1.0.0.0\r\n* ZoneTree version: 1.9.6.0\r\n* Microsoft.Data.Sqlite version: 10.0.0\r\n* SQLite runtime version: 3.50.3\r\n* SQLitePCLRaw.core version: 2.1.11\r\n* SQLitePCLRaw.lib.e_sqlite3 version: 3.50.3\r\n* RocksDbSharp version: 6.2.2\r\n* RocksDbNative version: 6.2.2\r\n* MySqlConnector version: 2.4.0",
+    "InterruptedPhase": null
+  },
+  {
+    "Engine": "RocksDB",
+    "Durability": "WAL enabled; five separate RocksDB instances; no WriteBatch across indexes; compression=Zstd; write_buffer_size=1024 MB per database; max_write_buffer_number=4.",
+    "StartedAtUtc": "2026-07-15T05:00:47.4851489Z",
+    "Workload": {
+      "Profiles": 1000000,
+      "Parallelism": 1,
+      "ReadCount": 1000000,
+      "EmailReadCount": 1000000,
+      "QueryCount": 250000,
+      "UpdateCount": 1000000,
+      "PostReadCount": 1000000,
+      "PostEmailReadCount": 1000000,
+      "PostQueryCount": 250000,
+      "QueryLimit": 50,
+      "Seed": 570123434,
+      "TimeoutSeconds": 120000
+    },
+    "EngineSettings": {
+      "Databases": "profiles,email-index,country-status-index,created-at-index,reputation-index",
+      "Compression": "Zstd",
+      "WriteBufferMb": "1024",
+      "MaxWriteBufferNumber": "4",
+      "WriteSync": "false",
+      "ReadStabilization": "Compact before read/query phases"
+    },
+    "Completed": true,
+    "Status": "Completed",
+    "Phases": [
+      {
+        "Name": "insert profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 9830.3709,
+        "OperationsPerSecond": 101725.56154519053,
+        "Checksum": "70EEB1E90366F6E5"
+      },
+      {
+        "Name": "read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 4244.8772,
+        "OperationsPerSecond": 235578.07514431747,
+        "Checksum": "0FB577C390019AC8"
+      },
+      {
+        "Name": "lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 8360.5592,
+        "OperationsPerSecond": 119609.22422509728,
+        "Checksum": "9C199CC596F7AC10"
+      },
+      {
+        "Name": "scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 1634.384,
+        "OperationsPerSecond": 152962.8288088968,
+        "Checksum": "61A2EA3E2821B78E"
+      },
+      {
+        "Name": "query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 15608.3884,
+        "OperationsPerSecond": 16017.028381994902,
+        "Checksum": "59430B6E3710B73A"
+      },
+      {
+        "Name": "scan created-at index",
+        "Operations": 250000,
+        "ElapsedMs": 2902.9034,
+        "OperationsPerSecond": 86120.67490774926,
+        "Checksum": "5DCF6A52134EE2E1"
+      },
+      {
+        "Name": "query created-at range",
+        "Operations": 250000,
+        "ElapsedMs": 17924.8488,
+        "OperationsPerSecond": 13947.119040691714,
+        "Checksum": "F7273374D314AB37"
+      },
+      {
+        "Name": "scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 1470.541,
+        "OperationsPerSecond": 170005.46057539366,
+        "Checksum": "29FF27B972C9DD05"
+      },
+      {
+        "Name": "query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 14131.2343,
+        "OperationsPerSecond": 17691.306696400894,
+        "Checksum": "BF3EF75489BD5D95"
+      },
+      {
+        "Name": "update profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 22255.7494,
+        "OperationsPerSecond": 44932.20974172184,
+        "Checksum": "2440ADD57E65500B"
+      },
+      {
+        "Name": "post-update read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 4282.1483,
+        "OperationsPerSecond": 233527.6431224953,
+        "Checksum": "7DB9AA24CC9A8B8E"
+      },
+      {
+        "Name": "post-update lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 8498.1008,
+        "OperationsPerSecond": 117673.35120336535,
+        "Checksum": "43569B6DA38ACCB5"
+      },
+      {
+        "Name": "post-update scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 1627.3925,
+        "OperationsPerSecond": 153619.97797089515,
+        "Checksum": "E81A287B61AC0B4A"
+      },
+      {
+        "Name": "post-update query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 15794.2492,
+        "OperationsPerSecond": 15828.546000147953,
+        "Checksum": "187087226FE86156"
+      },
+      {
+        "Name": "post-update scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 1562.2245,
+        "OperationsPerSecond": 160028.216175076,
+        "Checksum": "2FCAC43A8D128B85"
+      },
+      {
+        "Name": "post-update query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 14945.0612,
+        "OperationsPerSecond": 16727.934175338138,
+        "Checksum": "A983697B4465FA75"
+      }
+    ],
+    "RunElapsedMs": 148492.98,
+    "PreReadStabilizeMs": 1067.8115,
+    "PostUpdateStabilizeMs": 1853.0029,
+    "SettleMs": 0.9741,
+    "StorageSizeBytes": 328526846,
+    "ReopenMs": 46.9799,
+    "VerifyMs": 141.0351,
+    "VerifyChecksum": "B7578931045C8FC5",
+    "PeakProcessWorkingSetBytes": 661594112,
+    "Environment": "* OS: Microsoft Windows 10.0.26200\r\n* Architecture: X64\r\n* .NET: 10.0.6\r\n* CPU: Intel(R) Core(TM) Ultra 7 265KF\r\n* Logical processors: 20\r\n* Total available memory: 63.6 GB\r\n* Initial process working set: 143.0 MB\r\n* Benchmark version: 1.0.0.0\r\n* ZoneTree version: 1.9.6.0\r\n* Microsoft.Data.Sqlite version: 10.0.0\r\n* SQLite runtime version: 3.50.3\r\n* SQLitePCLRaw.core version: 2.1.11\r\n* SQLitePCLRaw.lib.e_sqlite3 version: 3.50.3\r\n* RocksDbSharp version: 6.2.2\r\n* RocksDbNative version: 6.2.2\r\n* MySqlConnector version: 2.4.0",
+    "InterruptedPhase": null
+  },
+  {
+    "Engine": "SQLite",
+    "Durability": "WAL journal mode; synchronous=NORMAL; cache=1024 MB; mmap=1024 MB; native SQL indexes; single-row writes use autocommit.",
+    "StartedAtUtc": "2026-07-15T05:03:16.3779713Z",
+    "Workload": {
+      "Profiles": 1000000,
+      "Parallelism": 1,
+      "ReadCount": 1000000,
+      "EmailReadCount": 1000000,
+      "QueryCount": 250000,
+      "UpdateCount": 1000000,
+      "PostReadCount": 1000000,
+      "PostEmailReadCount": 1000000,
+      "PostQueryCount": 250000,
+      "QueryLimit": 50,
+      "Seed": 570123434,
+      "TimeoutSeconds": 120000
+    },
+    "EngineSettings": {
+      "JournalMode": "WAL",
+      "Synchronous": "NORMAL",
+      "CacheMb": "1024",
+      "MmapMb": "1024",
+      "TempStore": "MEMORY"
+    },
+    "Completed": true,
+    "Status": "Completed",
+    "Phases": [
+      {
+        "Name": "insert profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 128306.1838,
+        "OperationsPerSecond": 7793.856620026758,
+        "Checksum": "70EEB1E90366F6E5"
+      },
+      {
+        "Name": "read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 2961.9517,
+        "OperationsPerSecond": 337615.2284995059,
+        "Checksum": "0FB577C390019AC8"
+      },
+      {
+        "Name": "lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 4073.1158,
+        "OperationsPerSecond": 245512.29307057755,
+        "Checksum": "9C199CC596F7AC10"
+      },
+      {
+        "Name": "scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 3135.5349,
+        "OperationsPerSecond": 79731.21268718776,
+        "Checksum": "61A2EA3E2821B78E"
+      },
+      {
+        "Name": "query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 17236.5434,
+        "OperationsPerSecond": 14504.06814164376,
+        "Checksum": "59430B6E3710B73A"
+      },
+      {
+        "Name": "scan created-at index",
+        "Operations": 250000,
+        "ElapsedMs": 3127.0456,
+        "OperationsPerSecond": 79947.66689683066,
+        "Checksum": "5DCF6A52134EE2E1"
+      },
+      {
+        "Name": "query created-at range",
+        "Operations": 250000,
+        "ElapsedMs": 15844.957,
+        "OperationsPerSecond": 15777.890719425744,
+        "Checksum": "F7273374D314AB37"
+      },
+      {
+        "Name": "scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 2716.9626,
+        "OperationsPerSecond": 92014.51650457022,
+        "Checksum": "29FF27B972C9DD05"
+      },
+      {
+        "Name": "query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 16076.2464,
+        "OperationsPerSecond": 15550.893770824514,
+        "Checksum": "BF3EF75489BD5D95"
+      },
+      {
+        "Name": "update profiles",
+        "Operations": 1000000,
+        "ElapsedMs": 181529.5266,
+        "OperationsPerSecond": 5508.745705063719,
+        "Checksum": "2440ADD57E65500B"
+      },
+      {
+        "Name": "post-update read by user id",
+        "Operations": 1000000,
+        "ElapsedMs": 2908.5765,
+        "OperationsPerSecond": 343810.7954183086,
+        "Checksum": "7DB9AA24CC9A8B8E"
+      },
+      {
+        "Name": "post-update lookup by email",
+        "Operations": 1000000,
+        "ElapsedMs": 4030.2079,
+        "OperationsPerSecond": 248126.15746200093,
+        "Checksum": "43569B6DA38ACCB5"
+      },
+      {
+        "Name": "post-update scan country/status index",
+        "Operations": 250000,
+        "ElapsedMs": 3053.533,
+        "OperationsPerSecond": 81872.37537632638,
+        "Checksum": "E81A287B61AC0B4A"
+      },
+      {
+        "Name": "post-update query country/status",
+        "Operations": 250000,
+        "ElapsedMs": 17645.3049,
+        "OperationsPerSecond": 14168.074817454699,
+        "Checksum": "187087226FE86156"
+      },
+      {
+        "Name": "post-update scan top reputation index",
+        "Operations": 250000,
+        "ElapsedMs": 2643.8653,
+        "OperationsPerSecond": 94558.52384007613,
+        "Checksum": "2FCAC43A8D128B85"
+      },
+      {
+        "Name": "post-update query top reputation",
+        "Operations": 250000,
+        "ElapsedMs": 16224.4548,
+        "OperationsPerSecond": 15408.838268019952,
+        "Checksum": "A983697B4465FA75"
+      }
+    ],
+    "RunElapsedMs": 421729.3976,
+    "PreReadStabilizeMs": null,
+    "PostUpdateStabilizeMs": null,
+    "SettleMs": 30.3488,
+    "StorageSizeBytes": 298430464,
+    "ReopenMs": 1.0307,
+    "VerifyMs": 58.2318,
+    "VerifyChecksum": "B7578931045C8FC5",
+    "PeakProcessWorkingSetBytes": 695754752,
+    "Environment": "* OS: Microsoft Windows 10.0.26200\r\n* Architecture: X64\r\n* .NET: 10.0.6\r\n* CPU: Intel(R) Core(TM) Ultra 7 265KF\r\n* Logical processors: 20\r\n* Total available memory: 63.6 GB\r\n* Initial process working set: 139.8 MB\r\n* Benchmark version: 1.0.0.0\r\n* ZoneTree version: 1.9.6.0\r\n* Microsoft.Data.Sqlite version: 10.0.0\r\n* SQLite runtime version: 3.50.3\r\n* SQLitePCLRaw.core version: 2.1.11\r\n* SQLitePCLRaw.lib.e_sqlite3 version: 3.50.3\r\n* RocksDbSharp version: 6.2.2\r\n* RocksDbNative version: 6.2.2\r\n* MySqlConnector version: 2.4.0",
+    "InterruptedPhase": null
+  }
+]
