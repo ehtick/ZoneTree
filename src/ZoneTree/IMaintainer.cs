@@ -4,7 +4,9 @@ namespace ZoneTree;
 /// Provides functionality to manage merge operations and memory compaction within the ZoneTree.
 /// </summary>
 /// <remarks>
-/// Ensure that all pending operations are either completed or cancelled before disposing of this maintainer.
+/// Disposal waits for tracked background merge threads to finish. Call
+/// <see cref="TryCancelBackgroundThreads"/> before disposal to request
+/// cancellation instead of waiting for the current work to complete normally.
 /// </remarks>
 public interface IMaintainer : IDisposable
 {
@@ -49,11 +51,19 @@ public interface IMaintainer : IDisposable
   /// <summary>
   /// Blocks the calling thread until all background threads have finished execution.
   /// </summary>
+  /// <remarks>
+  /// Disposal also waits for background threads. Call this method when merge
+  /// completion must be observed before the maintainer's lifetime ends.
+  /// </remarks>
   void WaitForBackgroundThreads();
 
   /// <summary>
   /// Asynchronously waits for the completion of all background threads.
   /// </summary>
+  /// <remarks>
+  /// Use this method when merge completion must be observed asynchronously
+  /// before the maintainer's lifetime ends.
+  /// </remarks>
   /// <returns>A task representing the asynchronous operation.</returns>
   Task WaitForBackgroundThreadsAsync();
 

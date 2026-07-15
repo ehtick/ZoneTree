@@ -10,8 +10,9 @@ namespace ZoneTree.Core;
 /// The maintainer for ZoneTree to control merge operations and memory compaction.
 /// </summary>
 /// <remarks>
-/// You must complete or cancel all pending tasks of this maintainer
-/// before disposing.
+/// Disposal waits for tracked background merge threads to finish. Call
+/// <see cref="TryCancelBackgroundThreads"/> before disposal to request
+/// cancellation instead of waiting for the current work to complete normally.
 /// </remarks>
 /// <typeparam name="TKey">The key type</typeparam>
 /// <typeparam name="TValue">The value type</typeparam>
@@ -286,10 +287,12 @@ public sealed class ZoneTreeMaintainer<TKey, TValue> : IMaintainer, IDisposable
   }
 
   /// <summary>
-  /// Disposes this maintainer.
+  /// Waits for tracked merge threads, stops periodic cache cleanup, detaches
+  /// event handlers, and disposes this maintainer.
   /// </summary>
   public void Dispose()
   {
+    WaitForBackgroundThreads();
     PeriodicTimerCancellationTokenSource.Cancel();
     PeriodicTimerCancellationTokenSource.Dispose();
     Maintenance.OnMutableSegmentMovedForward -= OnMutableSegmentMovedForward;

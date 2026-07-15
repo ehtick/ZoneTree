@@ -73,6 +73,7 @@ using ZoneTree;
 using var zoneTree = new ZoneTreeFactory<int, string>()
     .SetDataDirectory("data/my-zone-tree")
     .OpenOrCreate();
+using var maintainer = zoneTree.CreateMaintainer();
 
 zoneTree.Upsert(1, "Hello ZoneTree");
 
@@ -204,9 +205,10 @@ using var zoneTree = new ZoneTreeFactory<int, int>()
 
 ## Maintenance
 
-ZoneTree uses an LSM-tree architecture. Writes first enter a mutable segment and are later moved, merged, and compacted into persistent segments.
-
-For long-running applications, use the maintainer to run background maintenance.
+`CreateMaintainer()` returns an optional, ready-to-use background maintenance
+coordinator. It responds to ZoneTree events, starts and tracks merge operations
+according to configurable policies, and periodically releases inactive read
+buffers and cache entries.
 
 ```csharp
 using var zoneTree = new ZoneTreeFactory<int, string>()
@@ -216,12 +218,12 @@ using var zoneTree = new ZoneTreeFactory<int, string>()
 using var maintainer = zoneTree.CreateMaintainer();
 
 zoneTree.Upsert(1, "value");
-
-// Before shutdown, wait for background work if needed.
-maintainer.WaitForBackgroundThreads();
 ```
 
-Maintenance behavior can be tuned for different workloads.
+The maintainer is caller-owned and disposable; disposal waits for its tracked
+merge operations to finish. Without a maintainer, the caller is responsible for
+defining and coordinating maintenance through the state, events, and operations
+exposed by `zoneTree.Maintenance`.
 
 ---
 
@@ -303,7 +305,7 @@ Repository:
 
 Official documentation:
 
-* [Docs home](docs/README.md)
+* [Docs home](docs/index.md)
 * [Getting started](docs/getting-started.md)
 * [Reads and writes](docs/usage/reads-and-writes.md)
 * [Value mutability](docs/concepts/value-mutability.md)
