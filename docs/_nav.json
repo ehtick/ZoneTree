@@ -26,6 +26,7 @@
     "concepts/",
     "concepts/lsm-tree.md",
     "concepts/segments.md",
+    "concepts/bloom-filters.md",
     "concepts/key-ordering.md",
     "concepts/deletion-markers-and-ttl.md",
     "concepts/op-index.md",
