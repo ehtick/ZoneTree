@@ -51,19 +51,19 @@ ZoneTree is strongest when it is treated as a storage-engine foundation: an orde
 * [Segments](concepts/segments.md)
 * [Bloom filters](concepts/bloom-filters.md)
 * [Key ordering](concepts/key-ordering.md)
+* [Key components](concepts/serializers-and-comparers.md)
 * [Deletion markers and TTL](concepts/deletion-markers-and-ttl.md)
 * [Operation indexes](concepts/op-index.md)
 * [Value mutability](concepts/value-mutability.md)
 * [Disk segments](storage/disk-segments.md)
 * [File stream providers](storage/file-stream-providers.md)
 * [Memory usage](storage/memory-usage.md)
-* [Read-path caching](storage/read-path-caching.md)
 * [Compression](storage/compression.md)
-* [Key components](storage/serializers-and-comparers.md)
 
 ## Operate And Tune
 
 * [Configuration reference](reference/configuration.md)
+* [Read-path caching](tuning/read-path-caching.md)
 * [Disk-segment tuning](tuning/disk-segments.md)
 * [Write amplification](tuning/write-amplification.md)
 * [Large values](tuning/large-values.md)

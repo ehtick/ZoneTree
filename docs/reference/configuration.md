@@ -1,227 +1,194 @@
-# Configuration
+# Configuration Reference
 
-This page summarizes the most important configuration areas.
+`ZoneTreeFactory<TKey, TValue>` owns the configuration used to create or open a
+tree. Configure components and options before calling an open method.
 
-## Factory
+## Factory Entry Points
 
-`ZoneTreeFactory<TKey, TValue>` configures and opens a tree.
-
-Common methods:
-
-* `SetDataDirectory`
-* `SetWriteAheadLogDirectory`
-* `SetLogger`
-* `SetLogLevel`
-* `SetComparer`
-* `SetKeySerializer`
-* `SetValueSerializer`
-* `SetMutableSegmentMaxItemCount`
-* `SetDiskSegmentMaxItemCount`
-* `SetDiskSegmentCompressionBlockSize`
-* `SetRandomAccessDeviceManager`
-* `SetWriteAheadLogProvider`
-* `SetTransactionLog`
-* `SetIsDeletedDelegate`
-* `SetMarkValueDeletedDelegate`
-* `DisableDeletion`
-* `Configure`
-* `ConfigureWriteAheadLogOptions`
-* `ConfigureDiskSegmentOptions`
-* `ConfigureTransactionLog`
-* `OpenOrCreate`
-* `Open`
-* `Create`
-* `OpenOrCreateTransactional`
-
-Set serializers, comparers, deletion delegates, and storage providers before opening the tree. Serializers cannot be changed after the WAL provider or transaction log has been initialized.
-
-Comparer semantics are part of the persisted keyspace. ZoneTree stores the comparer type in metadata and validates it on open, but a custom comparer with the same type can still become incompatible if its comparison behavior changes. Create a new ZoneTree and rebuild/copy data when you need a different order.
-
-## Default Profile
-
-ZoneTree defaults are designed as a practical general-purpose profile. Start with them, then tune after measuring the actual workload.
-
-| Area | Default |
+| Purpose | API |
 | --- | --- |
-| Mutable segment max item count | `1_000_000` records |
-| Disk segment max item count | `20_000_000` records |
-| BTree lock mode | `NodeLevelMonitor` |
-| BTree node size | `128` |
-| BTree leaf size | `128` |
-| WAL mode | `AsyncCompressed` |
-| WAL compression block size | `256 KB` |
-| WAL compression | `Zstd`, level `0` |
-| Async compressed WAL empty queue poll interval | `100 ms` |
-| Sync compressed WAL tail writer | enabled |
-| Sync compressed WAL tail writer interval | `500 ms` |
-| Disk segment mode | `MultiPartDiskSegment` |
-| Disk segment compression block size | `4 MB` |
-| Disk segment compression | `Zstd`, level `0` |
-| Multipart minimum record count | `1_500_000` records |
-| Multipart maximum record count | `3_000_000` records |
-| Key cache size | `1024` records |
-| Value cache size | `1024` records |
-| Key cache lifetime | `10 seconds` |
-| Value cache lifetime | `10 seconds` |
-| Default sparse array step size | `1024` |
-| Maintainer maximum read-only segment count | `64` |
-| Maintainer merge record threshold | `0` records |
-| Maintainer block cache lifetime | `1 minute` |
-| Maintainer inactive cache cleanup interval | `30 seconds` |
-| Maintainer inactive cache cleanup job from `CreateMaintainer()` | enabled |
-| Live backup after normal merge | enabled |
-| Live backup in-memory records | enabled |
-| Live backup in-memory mode | `Live` |
-| Live backup file transfer concurrency | `8` |
-| Live backup record batch compression | `Zstd`, level `0` |
-| Live backup record batch compression block size | `1 MB` |
-| Console logger level | `Warning` |
+| data and WAL location | `SetDataDirectory`, `SetWriteAheadLogDirectory` |
+| key behavior | `SetComparer`, `SetKeyHasher`, `SetKeySerializer` |
+| value behavior | `SetValueSerializer`, deletion delegates |
+| mutable segment | `SetMutableSegmentMaxItemCount`, `SetMutableSegmentBloomFilterBitsPerItem` |
+| persistent segments | `SetDiskSegmentMaxItemCount`, `SetDiskSegmentCompressionBlockSize` |
+| grouped options | `Configure`, `ConfigureWriteAheadLogOptions`, `ConfigureDiskSegmentOptions` |
+| providers | `SetRandomAccessDeviceManager`, `SetWriteAheadLogProvider`, `SetTransactionLog` |
+| opening | `Create`, `Open`, `OpenOrCreate`, transactional variants |
 
-## Memory
+Known key/value types receive default serializers and, where applicable,
+comparers and key hashers. Custom types require explicit compatible components.
 
-`MutableSegmentMaxItemCount` controls when the active mutable segment is moved forward.
+## Core Defaults
 
-The default is `1_000_000` records. This is a good starting point for small keys and values. Lower it for large values. Raise it only when memory budget and maintenance behavior are understood.
+| Option | Default | Validated range or meaning |
+| --- | ---: | --- |
+| `MutableSegmentMaxItemCount` | `1_000_000` | at least `1_000` |
+| `MutableSegmentBloomFilterBitsPerItem` | `8` | `0..64`; `0` disables |
+| `DiskSegmentMaxItemCount` | `20_000_000` | at least `10_000` |
+| mutable B+Tree lock mode | `NodeLevelMonitor` | defined `BTreeLockMode` value |
+| mutable B+Tree node size | `128` | at least `16` |
+| mutable B+Tree leaf size | `128` | at least `16` |
+| single-segment garbage collection on load | disabled | boolean |
+| unsafe numeric option values | disabled | boolean; does not bypass required-component or enum validation |
 
-## Disk
+The public property identifiers `BTreeLockMode`, `BTreeNodeSize`, and
+`BTreeLeafSize` configure ZoneTree's mutable B+Tree.
 
-Disk segment options affect file layout, compression, circular key/value caches, sparse arrays, multipart sizing, and merge behavior.
+## Key Components
 
-Tune disk options with the actual read/write pattern.
-
-Important options:
-
-| Option | Purpose |
+| Component | Contract |
 | --- | --- |
-| `DiskSegmentMode` | single or multipart disk segment shape |
-| `CompressionBlockSize` | block size for compressed random-access disk data |
-| `CompressionMethod` | disk segment compression method |
-| `CompressionLevel` | compression level for the selected method |
-| `MinimumRecordCount` | lower target part size for multipart disk segments |
-| `MaximumRecordCount` | upper target part size for multipart disk segments |
-| `DefaultSparseArrayStepSize` | sparse index density for disk search |
-| `KeyCacheSize` | circular cache size for recently read keys |
-| `ValueCacheSize` | circular cache size for recently read values |
-| `KeyCacheRecordLifeTimeInMillisecond` | key cache record lifetime |
-| `ValueCacheRecordLifeTimeInMillisecond` | value cache record lifetime |
+| `Comparer` | defines key equality and total order |
+| `KeyHasher` | comparer-equal keys must hash equally |
+| `KeySerializer` | defines persisted key bytes |
+| `ValueSerializer` | defines persisted value bytes |
+| deletion delegates | define and create deletion markers |
 
-The default disk profile uses multipart disk segments, `20_000_000` as the disk segment max item count, `1_500_000` to `3_000_000` records per multipart part, `4 MB` disk compression blocks, Zstd level `0` compression, `1024` sparse array step size, and `1024` key/value cache entries with `10 second` lifetimes.
+Metadata records all four component type names. On open, ZoneTree validates
+the comparer and serializer types, but it does not currently reject a changed
+key-hasher type. A comparer-order or serializer-format change is a storage
+migration even when the .NET type name stays the same. A replacement hasher
+does not change persisted data, but it must remain compatible with comparer
+equality.
 
-The decompressed block cache is not configured by `DiskSegmentOptions`. Disk compression block size is configured here, but inactive decompressed block cleanup is controlled by the maintainer.
+## Mutable-Segment Bloom Filter
 
-## WAL
-
-WAL options control durability, compression, and backup behavior.
-
-The default WAL mode is `WriteAheadLogMode.AsyncCompressed`. It is the recommended starting point for most persistent databases because it keeps WAL protection enabled while preserving high write throughput.
+The filter is sized from `MutableSegmentMaxItemCount` and
+`MutableSegmentBloomFilterBitsPerItem`. Allocation rounds up to a power of two
+and is capped at `2^30` bits.
 
 ```csharp
-using ZoneTree.Options;
+using var zoneTree = new ZoneTreeFactory<long, string>()
+    .SetMutableSegmentMaxItemCount(500_000)
+    .SetMutableSegmentBloomFilterBitsPerItem(8)
+    .OpenOrCreate();
+```
 
-using var zoneTree = new ZoneTreeFactory<int, string>()
+Use `0` bits per item to disable the filter. A larger value is not free: it
+increases memory and does not eliminate comparer-based lookup after a possible
+match.
+
+See [mutable-segment Bloom filters](../concepts/bloom-filters.md) for sizing,
+false-positive behavior, and hasher requirements.
+
+## WAL Defaults
+
+| Option | Default | Validated range or meaning |
+| --- | ---: | --- |
+| `WriteAheadLogMode` | `AsyncCompressed` | defined mode |
+| `CompressionBlockSize` | `256 KB` | `256 KB..16 MB` |
+| `CompressionMethod` | `Zstd` | compatible method/level pair |
+| `CompressionLevel` | Zstd level `0` | method-specific |
+| async empty-queue poll interval | `100 ms` | non-negative |
+| sync-compressed tail writer | enabled | boolean |
+| sync-compressed tail writer interval | `500 ms` | non-negative |
+| incremental backup | disabled | used by transactional-log compaction |
+
+WAL options apply when new WALs are created. Existing WALs retain their stored
+options. The modes have different caller acknowledgment and failure boundaries;
+read [WAL modes](../durability/wal-modes.md) before changing them.
+
+## Disk-Segment Defaults
+
+| Option | Default | Validated range or meaning |
+| --- | ---: | --- |
+| `DiskSegmentMode` | `MultiPartDiskSegment` | defined mode |
+| `CompressionBlockSize` | `4 MB` | `1 MB..64 MB` |
+| `CompressionMethod` | `Zstd` | compatible method/level pair |
+| `CompressionLevel` | Zstd level `0` | method-specific |
+| `MinimumRecordCount` | `1_500_000` | at least `1_000` |
+| `MaximumRecordCount` | `3_000_000` | at least `2_000`; must exceed minimum |
+| `DefaultSparseArrayStepSize` | `1024` | non-negative; `0` disables |
+| `KeyCacheSize` | `1024` | non-negative; `0` disables |
+| `ValueCacheSize` | `1024` | non-negative; `0` disables |
+| key cache record lifetime | `10_000 ms` | non-negative |
+| value cache record lifetime | `10_000 ms` | non-negative |
+| `MaterializedEntryCacheSize` | `4096` chunks/block | non-negative; `0` disables |
+| `SearchHintPrefetchSize` | `16` entries | non-negative; `0` disables |
+
+Materialized chunks contain 16 aligned entries, so the default permits at most
+65,536 cached materialized positions in one decompressed block. Actual memory
+depends on key/value shape and accessed positions.
+
+```csharp
+using var zoneTree = new ZoneTreeFactory<long, string>()
+    .ConfigureDiskSegmentOptions(options =>
+    {
+        options.DefaultSparseArrayStepSize = 512;
+        options.MaterializedEntryCacheSize = 2048;
+        options.SearchHintPrefetchSize = 16;
+    })
+    .OpenOrCreate();
+```
+
+The active disk-segment options are persisted in ZoneTree metadata. Individual
+segment files also retain the physical format information required to read
+their stored representation.
+
+## Iterator Defaults
+
+| Option | Default | Meaning |
+| --- | ---: | --- |
+| `IteratorType` | `AutoRefresh` | refresh behavior |
+| `IncludeDeletedRecords` | `false` | hide deletion markers |
+| `ContributeToTheBlockCache` | `false` | avoid warming shared blocks during scans |
+| `DiskSegmentPrefetchSize` | `0` | values below `2` disable prefetch |
+
+Iterator options are per iterator and are not persisted.
+
+## Maintainer Defaults
+
+The maintainer owns runtime jobs and cache cleanup rather than persisted tree
+options. Important defaults include a one-minute inactive block lifetime and a
+30-second inactive-block cleanup interval.
+
+```csharp
+using var maintainer = zoneTree.CreateMaintainer();
+
+maintainer.BlockCacheLifeTime = TimeSpan.FromMinutes(1);
+maintainer.InactiveBlockCacheCleanupInterval = TimeSpan.FromSeconds(30);
+```
+
+These settings apply to a created maintainer. The `zoneTree.Maintenance` API
+exposes state, events, and operations for custom maintenance policy.
+
+## Validation
+
+The factory validates required components, enum values, compression
+compatibility, numeric ranges, multipart bounds, and a common case-insensitive
+string comparer/hasher mismatch.
+
+`AllowUnsafeOptionValues` bypasses numeric range checks for advanced or test
+configurations. It does not make invalid component combinations safe and should
+not be a production tuning shortcut.
+
+## Complete Configuration Example
+
+```csharp
+using ZoneTree;
+using ZoneTree.Options;
+using ZoneTree.WAL;
+
+using var zoneTree = new ZoneTreeFactory<long, string>()
     .SetDataDirectory("data/app")
+    .SetMutableSegmentMaxItemCount(500_000)
+    .SetMutableSegmentBloomFilterBitsPerItem(8)
     .ConfigureWriteAheadLogOptions(options =>
     {
         options.WriteAheadLogMode = WriteAheadLogMode.AsyncCompressed;
     })
-    .OpenOrCreate();
-```
-
-Important WAL options:
-
-| Option | Purpose |
-| --- | --- |
-| `WriteAheadLogMode` | chooses sync, sync-compressed, async-compressed, or no WAL |
-| `CompressionBlockSize` | compressed WAL block size |
-| `CompressionMethod` | compression method for compressed WAL modes |
-| `CompressionLevel` | compression level for the selected method |
-| `SyncCompressedModeOptions` | sync-compressed tail writer options |
-| `AsyncCompressedModeOptions` | async writer polling behavior |
-| `EnableIncrementalBackup` | preserves WAL content during WAL replacement/compaction |
-
-Use the default async compressed WAL as the starting point for most persistent data. Use Sync WAL when the application specifically needs the plain synchronous WAL path. Use sync-compressed WAL when the compressed WAL tradeoff is acceptable. Use `No WAL` only for cache, temporary, or intentionally rebuildable data.
-
-The default WAL profile uses async compressed WAL, `256 KB` compression blocks, Zstd level `0` compression, and a `100 ms` async empty-queue poll interval.
-
-Incremental backup is disabled by default. Enable it only when you intentionally need WAL history preserved during WAL replacement or compaction.
-
-```csharp
-using var zoneTree = new ZoneTreeFactory<int, string>()
-    .SetDataDirectory("data/app")
-    .ConfigureWriteAheadLogOptions(options =>
+    .ConfigureDiskSegmentOptions(options =>
     {
-        options.EnableIncrementalBackup = true;
+        options.DiskSegmentMode = DiskSegmentMode.MultiPartDiskSegment;
+        options.MaterializedEntryCacheSize = 4096;
+        options.SearchHintPrefetchSize = 16;
     })
     .OpenOrCreate();
+
+using var maintainer = zoneTree.CreateMaintainer();
 ```
 
-## Live Backup
-
-Live backup is configured with `LiveBackupOptions`.
-
-Important options:
-
-| Option | Purpose |
-| --- | --- |
-| `Store` | backup destination implementation |
-| `BackupAfterMerge` | requests a generation after successful normal merges |
-| `Schedule` | optional UTC schedule for automatic generations |
-| `IncludeInMemoryRecords` | streams mutable/read-only in-memory records into the generation |
-| `InMemoryMode` | chooses live or snapshot in-memory collection |
-| `RecordBatchCompression` | compression profile for in-memory record batches |
-| `MaxConcurrentFileTransfers` | concurrent disk segment file uploads |
-
-The local implementation is configured with `LocalLiveBackupOptions`:
-
-| Option | Purpose |
-| --- | --- |
-| `Directory` | local backup root directory |
-| `CopyBufferSize` | buffer size used for file copy operations |
-| `KeepLastGenerations` | optional local retention policy |
-
-Live backup is exposed for built-in non-transactional ZoneTree instances. Transactional trees need a transaction-aware backup design that captures transaction-log state together with storage-engine state.
-
-## Maintenance
-
-The maintainer controls background merge work and inactive cache cleanup. Inactive cache cleanup releases decompressed disk blocks and expired circular key/value cache records.
-
-The maintainer created by `zoneTree.CreateMaintainer()` uses these defaults:
-
-| Option | Default |
-| --- | --- |
-| `MaximumReadOnlySegmentCount` | `64` |
-| `ThresholdForMergeOperationStart` | `0` records |
-| `BlockCacheLifeTime` | `1 minute` |
-| `InactiveBlockCacheCleanupInterval` | `30 seconds` |
-| inactive-cache cleanup job | enabled |
-
-The normal `CreateMaintainer()` path starts the cleanup job by default. Longer `BlockCacheLifeTime` can improve repeated disk reads but retains more decompressed blocks in memory.
-
-## Deletion
-
-Deletion behavior is configured with:
-
-* `SetIsDeletedDelegate`,
-* `SetMarkValueDeletedDelegate`,
-* `DisableDeletion`.
-
-TTL can be modeled through custom deletion logic.
-
-## Logging
-
-Use `SetLogger` to integrate ZoneTree with your application's logging stack, or `SetLogLevel` to adjust the default console logger.
-
-```csharp
-using ZoneTree.Logger;
-
-using var zoneTree = new ZoneTreeFactory<int, string>()
-    .SetDataDirectory("data/app")
-    .SetLogLevel(LogLevel.Warning)
-    .OpenOrCreate();
-```
-
-## Storage Providers
-
-`SetRandomAccessDeviceManager` controls disk segment storage. `SetWriteAheadLogProvider` controls WAL storage. The default factory uses local file-system backed providers.
-
-These extension points are advanced. Use them when embedding ZoneTree into a custom storage environment.
+See [disk-segment tuning](../tuning/disk-segments.md),
+[read-path caching](../tuning/read-path-caching.md), and
+[key components](../concepts/serializers-and-comparers.md).

@@ -122,7 +122,7 @@ Longer cache lifetime can help repeated disk reads. Shorter cache lifetime
 reduces retained read-cache memory. The cleanup job releases inactive
 decompressed blocks and expired circular key/value cache records.
 
-For read-cache details, see [read-path caching](../storage/read-path-caching.md).
+For read-cache details, see [read-path caching](../tuning/read-path-caching.md).
 
 ## Bottom Segment Merge
 
@@ -276,4 +276,4 @@ maintainer.WaitForBackgroundThreads();
 
 For related tuning, see [memory usage](../storage/memory-usage.md),
 [disk segment tuning](../tuning/disk-segments.md), and
-[read-path caching](../storage/read-path-caching.md).
+[read-path caching](../tuning/read-path-caching.md).

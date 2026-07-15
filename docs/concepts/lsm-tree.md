@@ -74,4 +74,4 @@ The main LSM controls are:
 
 The practical decision is how much data to batch vertically, and how large each horizontal persistent rewrite unit should be.
 
-See [write amplification](../tuning/write-amplification.md), [disk segment tuning](../tuning/disk-segments.md), and [read-path caching](../storage/read-path-caching.md).
+See [write amplification](../tuning/write-amplification.md), [disk segment tuning](../tuning/disk-segments.md), and [read-path caching](../tuning/read-path-caching.md).

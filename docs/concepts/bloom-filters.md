@@ -92,7 +92,7 @@ Option validation detects the common case where a string comparer treats
 custom comparer and hasher implementations compatible. Test this contract over
 representative keys and equality edge cases.
 
-See [key components](../storage/serializers-and-comparers.md) for the complete comparer,
+See [key components](serializers-and-comparers.md) for the complete comparer,
 hasher, and serializer contracts.
 
 ## False Positives
@@ -154,4 +154,4 @@ single-thread and parallel throughput, write cost, lookup latency, retained
 memory, and observed false-positive behavior before changing the default.
 
 See [memory usage](../storage/memory-usage.md) for whole-tree capacity planning and
-[read-path caching](../storage/read-path-caching.md) for the other read accelerators.
+[read-path caching](../tuning/read-path-caching.md) for the other read accelerators.

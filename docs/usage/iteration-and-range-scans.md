@@ -154,5 +154,5 @@ using var iterator = zoneTree.CreateIterator();
 Long-lived iterators can delay physical deletion of segments replaced by a
 merge. Keep each iterator scoped to the scan that uses it.
 
-See [read-path caching](../storage/read-path-caching.md) for prefetch and block
+See [read-path caching](../tuning/read-path-caching.md) for prefetch and block
 cache tuning.
