@@ -152,7 +152,7 @@
     "VerifyMs": 11.808,
     "VerifyChecksum": "B7578931045C8FC5",
     "PeakProcessWorkingSetBytes": 1782685696,
-    "Environment": "* OS: Microsoft Windows 10.0.26200\r\n* Architecture: X64\r\n* .NET: 10.0.6\r\n* CPU: Intel(R) Core(TM) Ultra 7 265KF\r\n* Logical processors: 20\r\n* Total available memory: 63.6 GB\r\n* Initial process working set: 141.2 MB",
+    "Environment": "* OS: Microsoft Windows 10.0.26200\r\n* Architecture: X64\r\n* .NET: 10.0.6\r\n* CPU: Intel(R) Core(TM) Ultra 7 265KF\r\n* Logical processors: 20\r\n* Total available memory: 63.6 GB\r\n* Initial process working set: 141.2 MB\r\n* Benchmark version: 1.0.0.0\r\n* ZoneTree version: 1.9.6.0\r\n* Microsoft.Data.Sqlite version: 10.0.0\r\n* SQLite runtime version: 3.50.3\r\n* SQLitePCLRaw.core version: 2.1.11\r\n* SQLitePCLRaw.lib.e_sqlite3 version: 3.50.3\r\n* RocksDbSharp version: 6.2.2\r\n* RocksDbNative version: 6.2.2\r\n* MySqlConnector version: 2.4.0",
     "InterruptedPhase": null
   },
   {
@@ -306,7 +306,7 @@
     "VerifyMs": 141.0351,
     "VerifyChecksum": "B7578931045C8FC5",
     "PeakProcessWorkingSetBytes": 661594112,
-    "Environment": "* OS: Microsoft Windows 10.0.26200\r\n* Architecture: X64\r\n* .NET: 10.0.6\r\n* CPU: Intel(R) Core(TM) Ultra 7 265KF\r\n* Logical processors: 20\r\n* Total available memory: 63.6 GB\r\n* Initial process working set: 143.0 MB",
+    "Environment": "* OS: Microsoft Windows 10.0.26200\r\n* Architecture: X64\r\n* .NET: 10.0.6\r\n* CPU: Intel(R) Core(TM) Ultra 7 265KF\r\n* Logical processors: 20\r\n* Total available memory: 63.6 GB\r\n* Initial process working set: 143.0 MB\r\n* Benchmark version: 1.0.0.0\r\n* ZoneTree version: 1.9.6.0\r\n* Microsoft.Data.Sqlite version: 10.0.0\r\n* SQLite runtime version: 3.50.3\r\n* SQLitePCLRaw.core version: 2.1.11\r\n* SQLitePCLRaw.lib.e_sqlite3 version: 3.50.3\r\n* RocksDbSharp version: 6.2.2\r\n* RocksDbNative version: 6.2.2\r\n* MySqlConnector version: 2.4.0",
     "InterruptedPhase": null
   },
   {
@@ -459,7 +459,7 @@
     "VerifyMs": 58.2318,
     "VerifyChecksum": "B7578931045C8FC5",
     "PeakProcessWorkingSetBytes": 695754752,
-    "Environment": "* OS: Microsoft Windows 10.0.26200\r\n* Architecture: X64\r\n* .NET: 10.0.6\r\n* CPU: Intel(R) Core(TM) Ultra 7 265KF\r\n* Logical processors: 20\r\n* Total available memory: 63.6 GB\r\n* Initial process working set: 139.8 MB",
+    "Environment": "* OS: Microsoft Windows 10.0.26200\r\n* Architecture: X64\r\n* .NET: 10.0.6\r\n* CPU: Intel(R) Core(TM) Ultra 7 265KF\r\n* Logical processors: 20\r\n* Total available memory: 63.6 GB\r\n* Initial process working set: 139.8 MB\r\n* Benchmark version: 1.0.0.0\r\n* ZoneTree version: 1.9.6.0\r\n* Microsoft.Data.Sqlite version: 10.0.0\r\n* SQLite runtime version: 3.50.3\r\n* SQLitePCLRaw.core version: 2.1.11\r\n* SQLitePCLRaw.lib.e_sqlite3 version: 3.50.3\r\n* RocksDbSharp version: 6.2.2\r\n* RocksDbNative version: 6.2.2\r\n* MySqlConnector version: 2.4.0",
     "InterruptedPhase": null
   }
 ]

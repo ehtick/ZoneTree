@@ -1,5 +1,8 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using Microsoft.Data.Sqlite;
 
 namespace ProfileStore.Benchmark;
 
@@ -675,14 +678,99 @@ public sealed class BenchmarkRunner(BenchmarkConfig config)
 
   public static string GetEnvironment(long? initialProcessWorkingSetBytes)
   {
-    return string.Join(Environment.NewLine,
+    return string.Join(Environment.NewLine, CreateEnvironmentLines(initialProcessWorkingSetBytes));
+  }
+
+  static IReadOnlyList<string> CreateEnvironmentLines(long? initialProcessWorkingSetBytes)
+  {
+    var packageVersions = GetResolvedPackageVersions();
+    return
+    [
         $"* OS: {RuntimeInformation.OSDescription}",
         $"* Architecture: {RuntimeInformation.ProcessArchitecture}",
         $"* .NET: {Environment.Version}",
         $"* CPU: {GetCpuDescription()}",
         $"* Logical processors: {Environment.ProcessorCount}",
         $"* Total available memory: {FormatOptionalBytes(GetTotalAvailableMemoryBytes())}",
-        $"* Initial process working set: {FormatOptionalBytes(initialProcessWorkingSetBytes)}");
+        $"* Initial process working set: {FormatOptionalBytes(initialProcessWorkingSetBytes)}",
+        $"* Benchmark version: {GetAssemblyVersion(Assembly.GetEntryAssembly())}",
+        $"* ZoneTree version: {ZoneTree.Core.ZoneTreeInfo.ProductVersion}",
+        $"* Microsoft.Data.Sqlite version: {GetPackageVersion(packageVersions, "Microsoft.Data.Sqlite", typeof(SqliteConnection).Assembly)}",
+        $"* SQLite runtime version: {GetSqliteRuntimeVersion()}",
+        $"* SQLitePCLRaw.core version: {GetPackageVersion(packageVersions, "SQLitePCLRaw.core")}",
+        $"* SQLitePCLRaw.lib.e_sqlite3 version: {GetPackageVersion(packageVersions, "SQLitePCLRaw.lib.e_sqlite3")}",
+        $"* RocksDbSharp version: {GetPackageVersion(packageVersions, "RocksDbSharp")}",
+        $"* RocksDbNative version: {GetPackageVersion(packageVersions, "RocksDbNative")}",
+        $"* MySqlConnector version: {GetPackageVersion(packageVersions, "MySqlConnector")}"
+    ];
+  }
+
+  static string GetAssemblyVersion(Assembly? assembly)
+  {
+    return assembly?.GetName().Version?.ToString() ?? "n/a";
+  }
+
+  static string GetPackageVersion(
+      IReadOnlyDictionary<string, string> packageVersions,
+      string packageName,
+      Assembly? fallbackAssembly = null)
+  {
+    return packageVersions.TryGetValue(packageName, out var version)
+        ? version
+        : GetAssemblyVersion(fallbackAssembly);
+  }
+
+  static IReadOnlyDictionary<string, string> GetResolvedPackageVersions()
+  {
+    try
+    {
+      var assemblyPath = Assembly.GetEntryAssembly()?.Location;
+      if (string.IsNullOrWhiteSpace(assemblyPath))
+        return new Dictionary<string, string>();
+
+      var depsPath = Path.ChangeExtension(assemblyPath, ".deps.json");
+      if (!File.Exists(depsPath))
+        return new Dictionary<string, string>();
+
+      using var document = JsonDocument.Parse(File.ReadAllText(depsPath));
+      if (!document.RootElement.TryGetProperty("libraries", out var libraries))
+        return new Dictionary<string, string>();
+
+      var versions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+      foreach (var library in libraries.EnumerateObject())
+      {
+        if (!library.Value.TryGetProperty("type", out var type) ||
+            !string.Equals(type.GetString(), "package", StringComparison.OrdinalIgnoreCase))
+          continue;
+
+        var separator = library.Name.LastIndexOf('/');
+        if (separator <= 0 || separator == library.Name.Length - 1)
+          continue;
+
+        versions[library.Name[..separator]] = library.Name[(separator + 1)..];
+      }
+      return versions;
+    }
+    catch
+    {
+      return new Dictionary<string, string>();
+    }
+  }
+
+  static string GetSqliteRuntimeVersion()
+  {
+    try
+    {
+      using var connection = new SqliteConnection("Data Source=:memory:");
+      connection.Open();
+      using var command = connection.CreateCommand();
+      command.CommandText = "SELECT sqlite_version();";
+      return command.ExecuteScalar()?.ToString() ?? "n/a";
+    }
+    catch
+    {
+      return "n/a";
+    }
   }
 
   static string GetCpuDescription()

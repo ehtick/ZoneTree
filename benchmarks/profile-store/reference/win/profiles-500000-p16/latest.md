@@ -147,6 +147,15 @@ Checksum validation passed across completed engines: ZoneTree, RocksDB, SQLite.
 * Logical processors: 20
 * Total available memory: 63.6 GB
 * Initial process working set: 104.9 MB
+* Benchmark version: 1.0.0.0
+* ZoneTree version: 1.9.6.0
+* Microsoft.Data.Sqlite version: 10.0.0
+* SQLite runtime version: 3.50.3
+* SQLitePCLRaw.core version: 2.1.11
+* SQLitePCLRaw.lib.e_sqlite3 version: 3.50.3
+* RocksDbSharp version: 6.2.2
+* RocksDbNative version: 6.2.2
+* MySqlConnector version: 2.4.0
 
 ## Engine Settings
 
