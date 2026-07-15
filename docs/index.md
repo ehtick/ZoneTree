@@ -46,9 +46,10 @@ ZoneTree is strongest when it is treated as a storage-engine foundation: an orde
 * [Recovery](durability/recovery.md)
 * [Backups](durability/backups.md)
 
-## Understand Storage
+## Concepts And Storage
 
 * [Segments](concepts/segments.md)
+* [Bloom filters](concepts/bloom-filters.md)
 * [Key ordering](concepts/key-ordering.md)
 * [Deletion markers and TTL](concepts/deletion-markers-and-ttl.md)
 * [Operation indexes](concepts/op-index.md)
@@ -56,7 +57,6 @@ ZoneTree is strongest when it is treated as a storage-engine foundation: an orde
 * [Disk segments](storage/disk-segments.md)
 * [File stream providers](storage/file-stream-providers.md)
 * [Memory usage](storage/memory-usage.md)
-* [Bloom filters](storage/bloom-filters.md)
 * [Read-path caching](storage/read-path-caching.md)
 * [Compression](storage/compression.md)
 * [Key components](storage/serializers-and-comparers.md)
