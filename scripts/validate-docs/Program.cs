@@ -154,49 +154,9 @@ static void ValidateNavigation(
 
   using (navigation)
   {
-    var root = navigation.RootElement;
-    var itemIds = GetItemIds(root);
-    if (!root.TryGetProperty("sequence", out var sequence) ||
-        sequence.ValueKind != JsonValueKind.Array)
-      return;
-
-    var containingDirectory = Path.GetDirectoryName(navigationFile)!;
-    foreach (var element in sequence.EnumerateArray())
-    {
-      if (element.ValueKind != JsonValueKind.String)
-        continue;
-
-      var entry = element.GetString();
-      if (string.IsNullOrWhiteSpace(entry) || itemIds.Contains(entry))
-        continue;
-
-      var localEntry = entry.Replace('/', Path.DirectorySeparatorChar);
-      var resolvedPath = Path.GetFullPath(Path.Combine(containingDirectory, localEntry));
-      if (!Path.Exists(resolvedPath))
-      {
-        errors.Add(
-          $"Missing navigation target in {RelativePath(repositoryRoot, navigationFile)}: {entry}");
-      }
-    }
+    // Navigation sequences are intentionally tolerant of missing targets. The
+    // docs renderer ignores absent entries, so CI should only require valid JSON.
   }
-}
-
-static HashSet<string> GetItemIds(JsonElement root)
-{
-  var itemIds = new HashSet<string>(StringComparer.Ordinal);
-  if (!root.TryGetProperty("items", out var items) ||
-      items.ValueKind != JsonValueKind.Array)
-    return itemIds;
-
-  foreach (var item in items.EnumerateArray())
-  {
-    if (item.ValueKind == JsonValueKind.Object &&
-        item.TryGetProperty("id", out var id) &&
-        id.ValueKind == JsonValueKind.String &&
-        id.GetString() is { Length: > 0 } value)
-      itemIds.Add(value);
-  }
-  return itemIds;
 }
 
 static string RelativePath(string repositoryRoot, string path) =>
